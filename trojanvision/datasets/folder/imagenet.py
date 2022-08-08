@@ -46,9 +46,9 @@ class ImageNet(ImageFolder):
 
     name = 'imagenet'
     url = {
-        'train': 'http://www.image-net.org/challenges/LSVRC/2012/nnoupb/ILSVRC2012_img_train.tar',
-        'valid': 'http://www.image-net.org/challenges/LSVRC/2012/nnoupb/ILSVRC2012_img_val.tar',
-        'test': 'http://www.image-net.org/challenges/LSVRC/2012/nnoupb/ILSVRC2012_img_test.tar',
+        'train': 'http://www.image-net.org/challenges/LSVRC/2012/ILSVRC2012_img_train.tar',
+        'valid': 'http://www.image-net.org/challenges/LSVRC/2012/ILSVRC2012_img_val.tar',
+        'test': 'http://www.image-net.org/challenges/LSVRC/2012/ILSVRC2012_img_test.tar',
     }
     md5 = {
         'train': '1d675b47d978889d74fa0da5fadfb00e',
