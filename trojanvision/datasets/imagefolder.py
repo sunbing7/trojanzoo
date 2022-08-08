@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from trojanvision.datasets.imageset import ImageSet
 from trojanvision.utils.dataset import ZipFolder
 from trojanvision.environ import env
@@ -168,7 +167,7 @@ class ImageFolder(ImageSet):
         if hasattr(self, 'class_names'):
             return getattr(self, 'class_names')
         dataset: datasets.ImageFolder = self.get_org_dataset('train')
-        if isinstance(dataset, torchvision.datasets.ImageNet):
+        if isinstance(dataset, datasets.ImageNet):
             idx_to_class = {dataset.wnid_to_idx[wnid]: str(clss) for wnid, clss in zip(dataset.wnids, dataset.classes)}
         else:
             idx_to_class = {i: name for name, i in dataset.class_to_idx.items()}
