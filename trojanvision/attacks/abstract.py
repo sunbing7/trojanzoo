@@ -76,7 +76,7 @@ class BackdoorAttack(Attack):
                            help='target class of backdoor '
                            '(default: 0)')
         group.add_argument('--source_class', type=int, nargs='+',
-                           help='source class of backdoor '
+                           help='source class(es) of backdoor '
                            '(default: 1)')
         group.add_argument('--poison_percent', type=float,
                            help='malicious training data proportion '
@@ -96,8 +96,6 @@ class BackdoorAttack(Attack):
         self.mark = mark
         self.param_list['backdoor'] = ['train_mode', 'target_class', 'poison_percent', 'poison_num']
         self.source_class = source_class
-        print(source_class)
-        exit(0)
         self.target_class = target_class
         self.poison_percent = poison_percent
         self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
