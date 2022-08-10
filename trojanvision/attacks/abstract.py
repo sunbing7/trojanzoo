@@ -94,7 +94,7 @@ class BackdoorAttack(Attack):
         self.dataset: ImageSet
         self.model: ImageModel
         self.mark = mark
-        self.param_list['backdoor'] = ['train_mode', 'target_class', 'poison_percent', 'poison_num']
+        self.param_list['backdoor'] = ['train_mode', 'target_class', 'source_class', 'poison_percent', 'train_mode', 'poison_num']
         self.source_class = source_class
         self.target_class = target_class
         self.poison_percent = poison_percent
