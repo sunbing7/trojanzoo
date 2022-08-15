@@ -87,6 +87,13 @@ class ImageNet(ImageFolder):
         split = 'val' if mode == 'valid' else mode
         return datasets.ImageNet(root=self.folder_path, split=split, **kwargs)
 
+    def get_class_names(self) -> list[str]:
+        if hasattr(self, 'class_names'):
+            return getattr(self, 'class_names')
+        dataset: datasets.ImageNet = self.get_org_dataset('train')
+        classes: list[tuple[str, ...]] = dataset.classes
+        return [clss[0] for clss in classes]
+
 
 class Sample_ImageNet(ImageNet):
 

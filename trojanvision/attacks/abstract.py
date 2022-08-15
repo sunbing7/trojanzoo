@@ -75,6 +75,9 @@ class BackdoorAttack(Attack):
         group.add_argument('--target_class', type=int,
                            help='target class of backdoor '
                            '(default: 0)')
+        group.add_argument('--source_class', type=int, nargs='+',
+                           help='source class(es) of backdoor '
+                           '(default: 1)')
         group.add_argument('--poison_percent', type=float,
                            help='malicious training data proportion '
                            '(default: 0.01)')
@@ -91,7 +94,7 @@ class BackdoorAttack(Attack):
         self.dataset: ImageSet
         self.model: ImageModel
         self.mark = mark
-        self.param_list['backdoor'] = ['train_mode', 'target_class', 'poison_percent', 'poison_num']
+        self.param_list['backdoor'] = ['train_mode', 'target_class', 'source_class', 'poison_percent', 'train_mode', 'poison_num']
         self.source_class = source_class
         self.target_class = target_class
         self.poison_percent = poison_percent
