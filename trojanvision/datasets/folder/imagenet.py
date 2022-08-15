@@ -109,7 +109,7 @@ class ImageNet(ImageFolder):
             indices = idx[indices]
             dataset = dataset.dataset
 
-        if self.target_transform is not None:
+        if dataset.target_transform is not None:
             targets = [dataset.target_transform(t) for t in dataset.targets]
         else:
             targets = dataset.targets
