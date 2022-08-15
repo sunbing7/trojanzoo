@@ -69,7 +69,8 @@ class WasserteinBackdoor(BackdoorAttack):
         self.pgd_eps = pgd_eps
 
         data_channel = self.dataset.data_shape[0]
-        self.trigger_generator = self.get_trigger_generator(in_channels=data_channel)
+        image_size = self.dataset.data_shape[1]
+        self.trigger_generator = self.get_trigger_generator(in_channels=data_channel, image_size=image_size)
 
         assert len(self.model._model.classifier) == 1
 
@@ -181,7 +182,6 @@ class WasserteinBackdoor(BackdoorAttack):
         dataset = self.dataset.get_dataset('train', class_list=source_class)
         return dataset
 
-
         class_set_list = list()
         for _class in source_class:
             print(_class)
@@ -225,19 +225,25 @@ class WasserteinBackdoor(BackdoorAttack):
     # -------------------------------- Trigger Generator ------------------------------ #
 
     @staticmethod
-    def get_trigger_generator(in_channels: int = 3) -> torch.nn.Module:
-        if in_channels == 1:
-            # chs = (1, 64, 128, 256, 512, 1024)
-            enc_chs = (1, 64, 128)
-            dec_chs = (128, 64)
-        elif in_channels == 3:
-            # chs = (3, 64, 128, 256, 512, 1024)
-            enc_chs = (3, 64, 128)
-            dec_chs = (128, 64)
-        else:
-            raise NotImplementedError
+    def get_trigger_generator(in_channels: int = 3, image_size: int = 32) -> torch.nn.Module:
+        a = None
+        match image_size:
+            case 28:
+                a = [64, 128]
+            case 32:
+                a = [64, 128]
+            case 224:
+                a = [64, 128, 256, 512, 1024]
+            case _:
+                raise NotImplementedError
 
-        model = UNet(enc_chs=enc_chs, dec_chs=dec_chs, num_class=in_channels).to(device=env['device']).eval()
+        a.reverse()
+        dec_chs = tuple(a)
+        a.append(in_channels)
+        a.reverse()
+        enc_chs = tuple(a)
+
+        model = UNet(enc_chs=enc_chs, dec_chs=dec_chs, input_channel=in_channels).to(device=env['device']).eval()
         return model
 
     # -------------------------------- override functions ------------------------------ #
@@ -251,9 +257,9 @@ class WasserteinBackdoor(BackdoorAttack):
 class Block(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_ch, out_ch, 3)
+        self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding='same')
         self.relu = nn.ReLU()
-        self.conv2 = nn.Conv2d(out_ch, out_ch, 3)
+        self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding='same')
 
     def forward(self, x):
         return self.conv2(self.relu(self.conv1(x)))
@@ -296,20 +302,16 @@ class Decoder(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, enc_chs=(3, 64, 128, 256, 512, 1024), dec_chs=(1024, 512, 256, 128, 64), num_class=3,
-                 retain_dim=False, out_size=(32, 32)):
+    def __init__(self, enc_chs=(3, 64, 128, 256, 512, 1024), dec_chs=(1024, 512, 256, 128, 64), input_channel=3):
         super().__init__()
         self.encoder = Encoder(enc_chs)
         self.decoder = Decoder(dec_chs)
-        # self.head = nn.Conv2d(dec_chs[-1], num_class, 1)
-        self.head = nn.ConvTranspose2d(dec_chs[-1], num_class, 2, 2)
-        self.retain_dim = retain_dim
-        self.out_size = out_size
+        self.head = nn.Conv2d(dec_chs[-1], input_channel, 1)
 
-    def forward(self, x):
+    def forward(self, x, to_size=None):
         enc_ftrs = self.encoder(x)
         out = self.decoder(enc_ftrs[::-1][0], enc_ftrs[::-1][1:])
         out = self.head(out)
-        if self.retain_dim:
-            out = F.interpolate(out, self.out_size)
+        if to_size:
+            out = F.interpolate(out, to_size)
         return out
