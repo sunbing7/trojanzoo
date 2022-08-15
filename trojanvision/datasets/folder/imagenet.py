@@ -10,6 +10,10 @@ import json
 from trojanvision import __file__ as root_file
 root_dir = os.path.dirname(root_file)
 
+import torch
+import numpy as np
+from torch.utils.data import Dataset, Subset
+
 
 class ImageNet(ImageFolder):
     r"""ImageNet (ILSVRC2012) dataset introduced by Jia Deng and Feifei Li in 2012.
@@ -93,6 +97,26 @@ class ImageNet(ImageFolder):
         dataset: datasets.ImageNet = self.get_org_dataset('train')
         classes: list[tuple[str, ...]] = dataset.classes
         return [clss[0] for clss in classes]
+
+
+    def get_class_subset(self, dataset: torch.utils.data.Dataset,
+                         class_list: int | list[int]) -> torch.utils.data.Subset:
+
+        class_list = [class_list] if isinstance(class_list, int) else class_list
+        indices = np.arange(len(dataset))
+        if isinstance(dataset, Subset):
+            idx = np.array(dataset.indices)
+            indices = idx[indices]
+            dataset = dataset.dataset
+
+        if self.target_transform is not None:
+            targets = [self.target_transform(t) for t in self.targets]
+        else:
+            targets = self.targets
+        idx_bool = np.isin(targets.numpy(), class_list)
+        idx = np.arange(len(dataset))[idx_bool]
+        idx = np.intersect1d(idx, indices)
+        return Subset(dataset, idx)
 
 
 class Sample_ImageNet(ImageNet):

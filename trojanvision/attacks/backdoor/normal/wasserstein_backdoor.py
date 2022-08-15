@@ -182,28 +182,6 @@ class WasserteinBackdoor(BackdoorAttack):
         dataset = self.dataset.get_dataset('train', class_list=source_class)
         return dataset
 
-        class_set_list = list()
-        for _class in source_class:
-            print(_class)
-            class_set = self.dataset.get_class_subset(dataset, class_list=[_class])
-            class_set_list.append(class_set)
-        target_set = self.dataset.get_class_subset(dataset, class_list=[self.target_class])
-
-        if self.class_sample_num:
-            new_class_set_list = list()
-            for _class, class_set in zip(source_class, class_set_list):
-                print(_class)
-                subset1, subset2 = class_set.split_dataset(class_set, length=self.class_sample_num)
-                new_class_set_list.append(subset1)
-            class_set_list = new_class_set_list
-            subset1, subset2 = target_set.split_dataset(target_set, length=self.class_sample_num)
-            target_set = subset1
-
-        other_set = torch.utils.data.ConcatDataset(class_set_list)
-        data = {'other_set': other_set,
-                'target_set': target_set}
-        return data
-
     # -------------------------------- I/O ------------------------------ #
 
     def save(self, filename: str = None, **kwargs):
