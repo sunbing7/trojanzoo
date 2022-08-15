@@ -110,10 +110,11 @@ class ImageNet(ImageFolder):
             dataset = dataset.dataset
 
         if self.target_transform is not None:
-            targets = [self.target_transform(t) for t in self.targets]
+            targets = [dataset.target_transform(t) for t in dataset.targets]
         else:
-            targets = self.targets
-        idx_bool = np.isin(targets.numpy(), class_list)
+            targets = dataset.targets
+        targets = np.asarray(targets)
+        idx_bool = np.isin(targets, class_list)
         idx = np.arange(len(dataset))[idx_bool]
         idx = np.intersect1d(idx, indices)
         return Subset(dataset, idx)
