@@ -252,6 +252,18 @@ class WasserteinBackdoor(BackdoorAttack):
         _trigger_x = x + self.pgd_eps * _noise
         return torch.clip(_trigger_x, min=0.0, max=1.0)
 
+    def validate_fn(self,
+                    get_data_fn: Callable[..., tuple[torch.Tensor, torch.Tensor]] = None,
+                    loss_fn: Callable[..., torch.Tensor] = None,
+                    main_tag: str = 'valid', indent: int = 0,
+                    threshold: float = 3.0,
+                    **kwargs) -> tuple[float, float]:
+        clean_acc, _ = self.model._validate(print_prefix='Validate Clean', main_tag='valid clean',
+                                            get_data_fn=None, indent=indent, **kwargs)
+        asr, _ = self.model._validate(print_prefix='Validate ASR', main_tag='valid asr',
+                                      get_data_fn=self.get_data, keep_org=False, poison_label=True,
+                                      indent=indent, **kwargs)
+        return clean_acc + asr, clean_acc
 
 
 class Block(nn.Module):
