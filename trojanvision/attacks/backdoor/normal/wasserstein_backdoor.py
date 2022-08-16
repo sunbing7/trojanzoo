@@ -6,14 +6,14 @@ from ...abstract import BackdoorAttack
 
 from trojanvision.environ import env
 from trojanzoo.utils.logger import MetricLogger
-from trojanzoo.utils.tensor import tanh_func
 from trojanzoo.utils.output import ansi, get_ansi_len, output_iter
 
 import torch
-import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset
-import functools
+import math
+import random
+import numpy as np
 
 from typing import TYPE_CHECKING
 import argparse
@@ -76,8 +76,6 @@ class WasserteinBackdoor(BackdoorAttack):
 
 
     def attack(self, **kwargs):
-        # data = self.sample_data()
-        # other_set = data['other_set']
         other_set = self.sample_data()
 
         print('Step one')
@@ -93,7 +91,10 @@ class WasserteinBackdoor(BackdoorAttack):
     def train_poison_model(self, epochs : int = None, **kwargs):
         if epochs is None:
             epochs = self.train_poison_epochs
+        old_train_mode = self.train_mode
+        self.train_mode = 'loss'
         ret = super().attack(epochs=epochs, **kwargs)
+        self.train_mode = old_train_mode
         return ret
 
     def get_trigger_noise(self, _input: torch.Tensor) -> torch.Tensor:
@@ -163,24 +164,23 @@ class WasserteinBackdoor(BackdoorAttack):
             self.trigger_generator.eval()
         optimizer.zero_grad()
 
-
     def sample_data(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
-        r"""Sample data from each class. The returned data dict is:
-
-        * ``'other'``: ``(input, label)`` from source classes with batch size
-          ``self.class_sample_num * len(source_class)``.
-        * ``'target'``: ``(input, label)`` from target class with batch size
-          ``self.class_sample_num``.
-
-        Returns:
-            dict[str, tuple[torch.Tensor, torch.Tensor]]: Data dict.
-        """
         source_class = self.source_class or list(range(self.dataset.num_classes))
         source_class = source_class.copy()
         if self.target_class in source_class:
             source_class.remove(self.target_class)
         dataset = self.dataset.get_dataset('train', class_list=source_class)
         return dataset
+
+    def get_source_inputs_index(self, _label):
+        idx = None
+        for c in self.source_class:
+            _idx = _label.eq(c)
+            if idx is None:
+                idx = _idx
+            else:
+                idx = torch.logical_or(idx, _idx)
+        return idx
 
     # -------------------------------- I/O ------------------------------ #
 
@@ -242,6 +242,58 @@ class WasserteinBackdoor(BackdoorAttack):
                                       get_data_fn=self.get_data, keep_org=False, poison_label=True,
                                       indent=indent, **kwargs)
         return clean_acc + asr, clean_acc
+
+    def get_poison_dataset(self, poison_label: bool = True,
+                           poison_num: int = None,
+                           seed: int = None
+                           ) -> torch.utils.data.Dataset:
+        raise NotImplementedError
+
+    def get_data(self, data: tuple[torch.Tensor, torch.Tensor],
+                 org: bool = False, keep_org: bool = True,
+                 poison_label: bool = True, **kwargs
+                 ) -> tuple[torch.Tensor, torch.Tensor]:
+
+        _input, _label = self.model.get_data(data)
+        if not org:
+            if keep_org:
+                decimal, integer = math.modf(len(_label) * self.poison_ratio)
+                integer = int(integer)
+                if random.uniform(0, 1) < decimal:
+                    integer += 1
+            else:
+                integer = len(_label)
+            if not keep_org or integer:
+                idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
+                if np.sum(idx) <= 0:
+                    return _input, _label
+                idx = np.arange(len(idx))[idx]
+                idx = np.random.choice(idx, integer)
+                org_input, org_label = _input, _label
+                _input = self.add_mark(org_input[idx])
+                _label = org_label[idx]
+                if poison_label:
+                    _label = self.target_class * torch.ones_like(_label)
+                if keep_org:
+                    _input = torch.cat((_input, org_input))
+                    _label = torch.cat((_label, org_label))
+        return _input, _label
+
+    def loss_weighted(self, _input: torch.Tensor = None, _label: torch.Tensor = None,
+                      _output: torch.Tensor = None, loss_fn: Callable[..., torch.Tensor] = None,
+                      **kwargs) -> torch.Tensor:
+        loss_fn = loss_fn if loss_fn is not None else self.model.loss
+        loss_clean = loss_fn(_input, _label, **kwargs)
+        idx = self.get_source_inputs_index(_label)
+
+        if torch.sum(idx) > 0:
+            _src_input, _src_label = _input[idx], _label[idx]
+            trigger_input = self.add_mark(_src_input)
+            trigger_label = self.target_class * torch.ones_like(_src_label)
+            loss_poison = loss_fn(trigger_input, trigger_label, **kwargs)
+            return (1 - self.poison_percent) * loss_clean + self.poison_percent * loss_poison
+        else:
+            return loss_clean
 
 
 class Block(nn.Module):

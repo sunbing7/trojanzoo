@@ -255,9 +255,9 @@ class BackdoorAttack(Attack):
             if not keep_org or integer:
                 org_input, org_label = _input, _label
                 _input = self.add_mark(org_input[:integer])
-                _label = _label[:integer]
+                _label = org_label[:integer]
                 if poison_label:
-                    _label = self.target_class * torch.ones_like(org_label[:integer])
+                    _label = self.target_class * torch.ones_like(_label)
                 if keep_org:
                     _input = torch.cat((_input, org_input))
                     _label = torch.cat((_label, org_label))
