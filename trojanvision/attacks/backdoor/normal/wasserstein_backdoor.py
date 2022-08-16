@@ -43,7 +43,7 @@ class WasserteinBackdoor(BackdoorAttack):
                                 '(default: 450)')
         group.add_argument('--pgd_eps', type=int,
                            help='|noise|_{\infinity} <= pgd_esp '
-                                '(default: 0.01)')
+                                '(default: 0.1)')
         group.add_argument('--class_sample_num', type=int,
                            help='sampled input number of each class '
                                 '(default: None)')
@@ -54,7 +54,7 @@ class WasserteinBackdoor(BackdoorAttack):
                  train_poison_epochs: int = 1,
                  step_one_iterations: int = 50,
                  step_two_iterations: int = 450,
-                 pgd_eps: float = 0.01,
+                 pgd_eps: float = 0.1,
                  **kwargs):
         super().__init__(**kwargs)
 
@@ -74,15 +74,15 @@ class WasserteinBackdoor(BackdoorAttack):
 
         assert len(self.model._model.classifier) == 1
 
-
     def attack(self, **kwargs):
         other_set = self.sample_data()
+        other_loader = self.dataset.get_dataloader(mode='train', dataset=other_set)
 
         print('Step one')
         kwargs['epochs'] = self.train_poison_epochs
         for _iter in range(self.step_one_iterations):
             self.train_poison_model(**kwargs)
-            self.train_trigger_generator(other_set)
+            self.train_trigger_generator(other_loader)
         print('Step two')
         kwargs['epochs'] = self.train_poison_epochs * self.step_two_iterations
         ret = self.train_poison_model(**kwargs)
@@ -91,18 +91,17 @@ class WasserteinBackdoor(BackdoorAttack):
     def train_poison_model(self, epochs : int = None, **kwargs):
         if epochs is None:
             epochs = self.train_poison_epochs
-        old_train_mode = self.train_mode
-        self.train_mode = 'loss'
+        self.trigger_generator.eval()
+        self.model.train()
         ret = super().attack(epochs=epochs, **kwargs)
-        self.train_mode = old_train_mode
         return ret
 
     def get_trigger_noise(self, _input: torch.Tensor) -> torch.Tensor:
-        raw_output: torch.Tensor = self.trigger_generator(_input)
-        return raw_output.tanh()
+        raw_output = self.trigger_generator(_input)
+        trigger_output = raw_output.tanh()/2.0 + 0.5
+        return trigger_output - raw_output
 
-    def train_trigger_generator(self, other_set, verbose: bool = True):
-        other_loader = self.dataset.get_dataloader(mode='train', dataset=other_set)
+    def train_trigger_generator(self, other_loader, verbose: bool = True):
 
         normalized_weight = self.model._model.classifier[0].weight
         normalized_weight = torch.transpose(normalized_weight, 0, 1)
@@ -119,6 +118,7 @@ class WasserteinBackdoor(BackdoorAttack):
         print_prefix = 'Trigger Epoch'
 
         self.model.eval()
+        self.trigger_generator.train()
         for _epoch in range(self.train_trigger_epochs):
 
             _epoch += 1
