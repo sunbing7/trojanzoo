@@ -243,12 +243,6 @@ class WasserteinBackdoor(BackdoorAttack):
                                       indent=indent, **kwargs)
         return clean_acc + asr, clean_acc
 
-    def get_poison_dataset(self, poison_label: bool = True,
-                           poison_num: int = None,
-                           seed: int = None
-                           ) -> torch.utils.data.Dataset:
-        raise NotImplementedError
-
     def get_data(self, data: tuple[torch.Tensor, torch.Tensor],
                  org: bool = False, keep_org: bool = True,
                  poison_label: bool = True, **kwargs
@@ -282,18 +276,13 @@ class WasserteinBackdoor(BackdoorAttack):
     def loss_weighted(self, _input: torch.Tensor = None, _label: torch.Tensor = None,
                       _output: torch.Tensor = None, loss_fn: Callable[..., torch.Tensor] = None,
                       **kwargs) -> torch.Tensor:
-        loss_fn = loss_fn if loss_fn is not None else self.model.loss
-        loss_clean = loss_fn(_input, _label, **kwargs)
-        idx = self.get_source_inputs_index(_label)
+        raise NotImplementedError
 
-        if torch.sum(idx) > 0:
-            _src_input, _src_label = _input[idx], _label[idx]
-            trigger_input = self.add_mark(_src_input)
-            trigger_label = self.target_class * torch.ones_like(_src_label)
-            loss_poison = loss_fn(trigger_input, trigger_label, **kwargs)
-            return (1 - self.poison_percent) * loss_clean + self.poison_percent * loss_poison
-        else:
-            return loss_clean
+    def get_poison_dataset(self, poison_label: bool = True,
+                           poison_num: int = None,
+                           seed: int = None
+                           ) -> torch.utils.data.Dataset:
+        raise NotImplementedError
 
 
 class Block(nn.Module):

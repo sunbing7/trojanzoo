@@ -490,7 +490,11 @@ def accuracy(_output: torch.Tensor, _label: torch.Tensor, num_classes: int,
     batch_size = _label.size(0)
     _, pred = _output.topk(maxk, 1, True, True)
     pred = pred.t()
-    correct = pred.eq(_label[None])
+    if len(_label.shape) > 1:
+        __label = torch.argmax(_label, dim=-1)
+        correct = pred.eq(__label[None])
+    else:
+        correct = pred.eq(_label[None])
     res: list[float] = []
     for k in topk:
         if k > num_classes:
