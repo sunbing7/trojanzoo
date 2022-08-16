@@ -26,10 +26,10 @@ class TSABackdoor(BackdoorAttack):
         super().add_argument(group)
         group.add_argument('--train_mark_epochs', type=int,
                            help='epochs to train trigger'
-                                '(default: 100)')
+                                '(default: 200)')
         group.add_argument('--train_poison_epochs', type=int,
                            help='epochs to train poison model'
-                                '(default: 100)')
+                                '(default: 10)')
         group.add_argument('--train_mark_lr', type=float,
                            help='learning rate for trigger training'
                                 '(default: 0.1)')
@@ -45,9 +45,9 @@ class TSABackdoor(BackdoorAttack):
         return group
 
     def __init__(self,
-                 train_mark_epochs: int = 100,
+                 train_mark_epochs: int = 200,
                  train_mark_lr: float = 1.0,
-                 train_poison_epochs: int = 100,
+                 train_poison_epochs: int = 10,
                  alpha: float = 0.3,
                  lp_norm: float = 2,
                  tsa_patience: int = 5,
