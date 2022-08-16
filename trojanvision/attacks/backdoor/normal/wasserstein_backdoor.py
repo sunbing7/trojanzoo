@@ -58,9 +58,9 @@ class WasserteinBackdoor(BackdoorAttack):
                  **kwargs):
         super().__init__(**kwargs)
 
-        self.param_list['latent_backdoor'] = ['class_sample_num',
-                                              'train_trigger_epochs', 'train_poison_epochs',
-                                              'step_one_iterations', 'step_two_iterations', 'pgd_eps']
+        self.param_list['wasserstein_backdoor'] = ['class_sample_num',
+                                                   'train_trigger_epochs', 'train_poison_epochs',
+                                                   'step_one_iterations', 'step_two_iterations', 'pgd_eps']
         self.class_sample_num = class_sample_num
         self.train_poison_epochs = train_poison_epochs
         self.train_trigger_epochs = train_trigger_epochs
@@ -190,6 +190,7 @@ class WasserteinBackdoor(BackdoorAttack):
         file_path = os.path.join(self.folder_path, filename)
         torch.save(self.trigger_generator.state_dict(), file_path + '_trigger.pth')
         self.model.save(file_path + '.pth')
+        self.save_params(file_path + '.yaml')
         print('attack results saved at: ', file_path)
 
     def load(self, filename: str = None, **kwargs):
@@ -198,6 +199,7 @@ class WasserteinBackdoor(BackdoorAttack):
         file_path = os.path.join(self.folder_path, filename)
         self.trigger_generator.load_state_dict(torch.load(file_path + '_trigger.pth'))
         self.model.load(file_path + '.pth')
+        self.load_params(file_path + '.yaml')
         print('attack results loaded from: ', file_path)
 
     # -------------------------------- Trigger Generator ------------------------------ #
@@ -242,6 +244,14 @@ class WasserteinBackdoor(BackdoorAttack):
                                       get_data_fn=self.get_data, keep_org=False, poison_label=True,
                                       indent=indent, **kwargs)
         return clean_acc + asr, clean_acc
+
+    def get_filename(self, mark_alpha: float = None, target_class: int = None, **kwargs) -> str:
+        r"""Get filenames for current attack settings."""
+        target_class = self.target_class
+        source_class = self.source_class
+        _file = 'wb_tar{target:d}_src{source}pgd{pgd_eps:.2f}'.format(
+            target=target_class, source=source_class, pgd_eps=self.pgd_eps)
+        return _file
 
     def get_data(self, data: tuple[torch.Tensor, torch.Tensor],
                  org: bool = False, keep_org: bool = True,

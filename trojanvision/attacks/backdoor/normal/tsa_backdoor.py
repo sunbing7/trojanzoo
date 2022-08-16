@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import random
 import math
 import numpy as np
+import yaml
 
 from typing import TYPE_CHECKING
 import argparse
@@ -54,12 +55,12 @@ class TSABackdoor(BackdoorAttack):
                  **kwargs):
         super().__init__(**kwargs)
 
-        self.param_list['latent_backdoor'] = ['train_mark_epochs',
-                                              'train_poison_epochs',
-                                              'train_mark_lr',
-                                              'alpha',
-                                              'lp_norm',
-                                              'tsa_patience']
+        self.param_list['tsa_backdoor'] = ['train_mark_epochs',
+                                           'train_poison_epochs',
+                                           'train_mark_lr',
+                                           'alpha',
+                                           'lp_norm',
+                                           'tsa_patience']
         self.train_mark_epochs = train_mark_epochs
         self.train_mark_lr = train_mark_lr
         self.train_poison_epochs = train_poison_epochs
@@ -87,7 +88,7 @@ class TSABackdoor(BackdoorAttack):
 
         return ret
 
-    def train_poison_model(self, epochs : int = None, **kwargs):
+    def train_poison_model(self, epochs: int = None, **kwargs):
         if epochs is None:
             epochs = self.train_poison_epochs
         ret = super().attack(epochs=epochs, **kwargs)
@@ -322,6 +323,3 @@ class TSABackdoor(BackdoorAttack):
                            seed: int = None
                            ) -> torch.utils.data.Dataset:
         raise NotImplementedError
-
-
-

@@ -17,6 +17,7 @@ import functools
 import math
 import random
 import os
+import yaml
 
 import argparse
 from collections.abc import Callable
@@ -94,7 +95,7 @@ class BackdoorAttack(Attack):
         self.dataset: ImageSet
         self.model: ImageModel
         self.mark = mark
-        self.param_list['backdoor'] = ['train_mode', 'target_class', 'source_class', 'poison_percent', 'train_mode', 'poison_num']
+        self.param_list['backdoor'] = ['train_mode', 'target_class', 'source_class', 'poison_percent', 'poison_num']
         self.source_class = source_class
         self.target_class = target_class
         self.poison_percent = poison_percent
@@ -188,6 +189,28 @@ class BackdoorAttack(Attack):
 
     # ---------------------- I/O ----------------------------- #
 
+    def save_params(self, file_path, obj=None):
+        if obj is None:
+            obj = self
+        param_dict = dict()
+        for key in obj.param_list:
+            for pn in obj.param_list[key]:
+                param_dict[pn] = getattr(obj, pn)
+        with open(file_path, 'w') as fh:
+            yaml.dump(param_dict, fh)
+        return param_dict
+
+    def load_params(self, file_path, obj=None):
+        if not os.path.exists(file_path):
+            return None
+        if obj is None:
+            obj = self
+        with open(file_path, 'r') as fh:
+            param_dict = yaml.load(fh, Loader=yaml.FullLoader)
+        for pn in param_dict:
+            setattr(obj, pn, param_dict[pn])
+        return param_dict
+
     def save(self, filename: str = None, **kwargs):
         r"""Save attack results to files."""
         filename = filename or self.get_filename(**kwargs)
@@ -195,6 +218,8 @@ class BackdoorAttack(Attack):
         np.save(file_path + '.npy', self.mark.mark.detach().cpu().numpy())
         F.to_pil_image(self.mark.mark).save(file_path + '.png')
         self.model.save(file_path + '.pth')
+        self.save_params(file_path + '.yaml')
+        self.save_params(file_path + '_mark.yaml', obj=self.mark)
         print('attack results saved at: ', file_path)
 
     def load(self, filename: str = None, **kwargs):
@@ -203,6 +228,8 @@ class BackdoorAttack(Attack):
         file_path = os.path.join(self.folder_path, filename)
         self.mark.load_mark(file_path + '.npy', already_processed=True)
         self.model.load(file_path + '.pth')
+        self.load_params(file_path + '.yaml')
+        self.load_params(file_path + '_mark.yaml', obj=self.mark)
         print('attack results loaded from: ', file_path)
 
     # ---------------------- Utils ---------------------------- #
