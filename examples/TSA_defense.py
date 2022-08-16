@@ -33,6 +33,7 @@ if __name__ == '__main__':
     kwargs['mark_random_init'] = True
     mark = trojanvision.marks.create(dataset=dataset, **kwargs)
     attack = trojanvision.attacks.create(dataset=dataset, model=model, mark=mark, **kwargs)
+    kwargs['benign_model'] = benign_model
     defense = trojanvision.defenses.create(dataset=dataset, model=model, attack=attack, **kwargs)
 
     if env['verbose']:

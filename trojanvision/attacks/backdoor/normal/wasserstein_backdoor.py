@@ -88,12 +88,13 @@ class WasserteinBackdoor(BackdoorAttack):
         ret = self.train_poison_model(**kwargs)
         return ret
 
-    def train_poison_model(self, epochs : int = None, **kwargs):
-        if epochs is None:
-            epochs = self.train_poison_epochs
+    def train_poison_model(self, **kwargs):
         self.trigger_generator.eval()
         self.model.train()
-        ret = super().attack(epochs=epochs, **kwargs)
+        old_epochs = kwargs['epochs']
+        kwargs['epochs'] = self.train_poison_epochs
+        ret = super().attack(**kwargs)
+        kwargs['epochs'] = old_epochs
         return ret
 
     def get_trigger_noise(self, _input: torch.Tensor) -> torch.Tensor:

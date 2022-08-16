@@ -75,6 +75,13 @@ class TSABackdoor(BackdoorAttack):
         self.init_cost = 1e-3
         self.cost = 0.0
 
+        source_class = self.source_class or list(range(self.dataset.num_classes))
+        source_class = source_class.copy()
+        if self.target_class in source_class:
+            source_class.remove(self.target_class)
+        if self.source_class is None:
+            self.source_class = source_class
+
     def attack(self, **kwargs):
         source_set = self.sample_data()
         source_loader = self.dataset.get_dataloader(mode='train', dataset=source_set)
@@ -88,10 +95,11 @@ class TSABackdoor(BackdoorAttack):
 
         return ret
 
-    def train_poison_model(self, epochs: int = None, **kwargs):
-        if epochs is None:
-            epochs = self.train_poison_epochs
-        ret = super().attack(epochs=epochs, **kwargs)
+    def train_poison_model(self, **kwargs):
+        old_epochs = kwargs['epochs']
+        kwargs['epochs'] = self.train_poison_epochs
+        ret = super().attack(**kwargs)
+        kwargs['epochs'] = old_epochs
         return ret
 
     def optimize_mark(self, label: int,
@@ -250,11 +258,8 @@ class TSABackdoor(BackdoorAttack):
             self.cost_set_counter = 0
 
     def sample_data(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
-        source_class = self.source_class or list(range(self.dataset.num_classes))
-        source_class = source_class.copy()
-        if self.target_class in source_class:
-            source_class.remove(self.target_class)
-        dataset = self.dataset.get_dataset('train', class_list=source_class)
+
+        dataset = self.dataset.get_dataset('train', class_list=self.source_class)
         return dataset
 
     def get_source_inputs_index(self, _label):

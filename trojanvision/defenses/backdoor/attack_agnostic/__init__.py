@@ -6,8 +6,9 @@ from .fine_pruning import FinePruning
 from .magnet import MagNet
 from .randomized_smooth import RandomizedSmooth
 from .recompress import Recompress
+from .tsa_defense import TSADefense
 
-__all__ = ['AdvTrain', 'FinePruning', 'MagNet', 'RandomizedSmooth', 'Recompress']
+__all__ = ['AdvTrain', 'FinePruning', 'MagNet', 'RandomizedSmooth', 'Recompress', 'TSADefense']
 
 class_dict: dict[str, type[BackdoorDefense]] = {
     'adv_train': AdvTrain,
@@ -15,4 +16,5 @@ class_dict: dict[str, type[BackdoorDefense]] = {
     'magnet': MagNet,
     'randomized_smooth': RandomizedSmooth,
     'recompress': Recompress,
+    'tsa_defense': TSADefense,
 }
