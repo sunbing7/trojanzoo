@@ -36,6 +36,9 @@ class TSABackdoor(BackdoorAttack):
         group.add_argument('--alpha', type=float,
                            help='probability difference desired to attain'
                                 '(default: 0.3)')
+        group.add_argument('--lp_norm', type=float,
+                           help='lp-norm regularizer'
+                                '(default: 2)')
         return group
 
     def __init__(self,
@@ -43,17 +46,20 @@ class TSABackdoor(BackdoorAttack):
                  train_mark_lr: float = 1.0,
                  train_poison_epochs: int = 100,
                  alpha: float = 0.3,
+                 lp_norm: float = 2,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.param_list['latent_backdoor'] = ['train_mark_epochs',
                                               'train_poison_epochs',
                                               'train_mark_lr',
-                                              'alpha']
+                                              'alpha',
+                                              'lp_norm']
         self.train_mark_epochs = train_mark_epochs
         self.train_mark_lr = train_mark_lr
         self.train_poison_epochs = train_poison_epochs
         self.alpha = alpha
+        self.lp_norm = lp_norm
         self.weight_mark_l1_norm = 0.0
         self.acc_threshold = 99.0
 
@@ -69,6 +75,8 @@ class TSABackdoor(BackdoorAttack):
 
         print('Step one')
         mark_best, loss_best = self.optimize_mark(self.target_class, source_loader)
+
+        self.save(**kwargs)
 
         print('Step two')
         ret = self.train_poison_model(**kwargs)
@@ -146,7 +154,7 @@ class TSABackdoor(BackdoorAttack):
                 src_probs = torch.sum(trigger_probs * src_ones, dim=-1)
                 probs_diff = torch.mean(src_probs - tgt_probs)
 
-                batch_norm: torch.Tensor = self.mark.mark[-1].norm(p=1)
+                batch_norm: torch.Tensor = self.mark.mark[-1].norm(p=self.lp_norm)
                 batch_loss = batch_entropy + self.cost * batch_norm
 
                 batch_loss.backward()
@@ -167,7 +175,7 @@ class TSABackdoor(BackdoorAttack):
             # check to save best mask or not
             loss = batch_logger.meters['loss'].global_avg
             acc = batch_logger.meters['acc'].global_avg
-            norm = float(self.mark.mark[-1].norm(p=1))
+            norm = float(self.mark.mark[-1].norm(p=self.lp_norm))
             entropy = batch_logger.meters['entropy'].global_avg
             probs_diff = batch_logger.meters['probs_diff'].global_avg
             print(
@@ -179,7 +187,7 @@ class TSABackdoor(BackdoorAttack):
                     entropy,
                     probs_diff))
 
-            self.adjust_weight_norm_l1(acc)
+            self.adjust_weight_norm_lp(acc)
             print(self.cost)
 
             if acc >= self.acc_threshold and norm < norm_best:
@@ -202,7 +210,7 @@ class TSABackdoor(BackdoorAttack):
         trigger_label = (tgt_ones * (1.0 - prob_diff) + src_ones * (1.0 + prob_diff)) / 2.0
         return trigger_label
 
-    def adjust_weight_norm_l1(self, acc):
+    def adjust_weight_norm_lp(self, acc):
         if self.cost == 0 and acc >= self.acc_threshold:
             self.cost_set_counter += 1
             if self.cost_set_counter >= self.patience:
@@ -313,5 +321,12 @@ class TSABackdoor(BackdoorAttack):
             return (1 - self.poison_percent) * loss_clean + self.poison_percent * loss_poison
         else:
             return loss_clean
+
+    def get_poison_dataset(self, poison_label: bool = True,
+                           poison_num: int = None,
+                           seed: int = None
+                           ) -> torch.utils.data.Dataset:
+        raise NotImplementedError
+
 
 
