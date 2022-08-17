@@ -208,7 +208,7 @@ class TrainingFiltering(BackdoorDefense):
     @classmethod
     def add_argument(cls, group: argparse._ArgumentGroup):
         super().add_argument(group)
-        group.add_argument('--defense_input_num', type=int,
+        group.add_argument('--defense_input_num', type=float,
                            help='the number of training inputs to evaluate '
                            '(default: None)')
         return group

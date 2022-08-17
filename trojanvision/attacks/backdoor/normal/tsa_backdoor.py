@@ -2,6 +2,8 @@ from ...abstract import BackdoorAttack
 
 from trojanzoo.utils.logger import MetricLogger
 from trojanzoo.utils.tensor import tanh_func
+from trojanzoo.utils.data import TensorListDataset, sample_batch
+from trojanzoo.environ import env
 
 import torch
 import torch.optim as optim
@@ -9,7 +11,6 @@ import torch.nn.functional as F
 import random
 import math
 import numpy as np
-import yaml
 
 from typing import TYPE_CHECKING
 import argparse
@@ -318,13 +319,26 @@ class TSABackdoor(BackdoorAttack):
                     _label = torch.cat((_label, org_label))
         return _input, _label
 
-    def loss_weighted(self, _input: torch.Tensor = None, _label: torch.Tensor = None,
-                      _output: torch.Tensor = None, loss_fn: Callable[..., torch.Tensor] = None,
-                      **kwargs) -> torch.Tensor:
-        raise NotImplementedError
-
     def get_poison_dataset(self, poison_label: bool = True,
                            poison_num: int = None,
                            seed: int = None
                            ) -> torch.utils.data.Dataset:
+        if seed is None:
+            seed = env['data_seed']
+        torch.random.manual_seed(seed)
+        train_set = self.dataset.loader['train'].dataset
+        poison_num = poison_num or round(self.poison_ratio * len(train_set))
+
+        dataset = self.dataset.get_dataset('train', class_list=self.source_class)
+        _input, _label = sample_batch(dataset, batch_size=poison_num)
+        _label = _label.tolist()
+
+        if poison_label:
+            _label = [self.target_class] * len(_label)
+        trigger_input = self.add_mark(_input)
+        return TensorListDataset(trigger_input, _label)
+
+    def loss_weighted(self, _input: torch.Tensor = None, _label: torch.Tensor = None,
+                      _output: torch.Tensor = None, loss_fn: Callable[..., torch.Tensor] = None,
+                      **kwargs) -> torch.Tensor:
         raise NotImplementedError
