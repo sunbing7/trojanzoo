@@ -41,15 +41,22 @@ class SCAn(TrainingFiltering):
         group.add_argument('--repr_dim', type=int,
                            help='maximum representation dimensions'
                                 '(default: 512)')
+        group.add_argument('--defense_input_ratio', type=float,
+                           help='ratio of clean training data used to launch SCAn'
+                                '(default: 0.1)')
         return group
 
     def __init__(self,
                  sc_threshold: float = math.exp(2),
                  repr_layer: str = 'flatten',
                  repr_dim: int = 512,
+                 defense_input_ratio: float = 0.1,
                  **kwargs):
-        super().__init__(**kwargs)
-        self.param_list['scan'] = ['sc_threshold', 'repr_layer', 'repr_dim', 'defense_input_num']
+        defense_input_ratio = max(min(defense_input_ratio, 1.0), 0.0)
+        defense_input_num = round(defense_input_ratio * len(kwargs['dataset'].loader['train'].dataset))
+        self.defense_input_ratio = defense_input_ratio
+        super().__init__(defense_input_num=defense_input_num, **kwargs)
+        self.param_list['scan'] = ['sc_threshold', 'repr_layer', 'repr_dim', 'defense_input_ratio']
 
         self.sc_threshold = sc_threshold
         self.repr_layer = repr_layer
@@ -156,13 +163,8 @@ class SCAn(TrainingFiltering):
         if not self.defense_input_num:
             return self.dataset.loader['train'].dataset, self.attack.poison_set
 
-        if self.defense_input_num <= 1.0:
-            input_num = int(self.defense_input_num * len(self.dataset.loader['train'].dataset))
-        else:
-            input_num = int(self.defense_input_num)
-
         poison_set = self.attack.poison_set
-        clean_input, clean_label = sample_batch(self.dataset.loader['train'].dataset, batch_size=input_num)
+        clean_input, clean_label = sample_batch(self.dataset.loader['train'].dataset, batch_size=self.defense_input_num)
         clean_set = TensorListDataset(clean_input, clean_label.tolist())
         return clean_set, poison_set
 
