@@ -55,10 +55,6 @@ class TSADefense(BackdoorDefense):
     def detect(self, **kwargs):
         super().detect(**kwargs)
 
-        print('L0-norm of mark:', self.attack.mark.mark[-1].norm(p=0).item())
-        print('L1-norm of mark:', self.attack.mark.mark[-1].norm(p=1).item())
-        print('L2-norm of mark:', self.attack.mark.mark[-1].norm(p=2).item())
-
         source_class = self.attack.source_class or list(range(self.dataset.num_classes))
         source_class = source_class.copy()
         if self.attack.target_class in source_class:
@@ -66,16 +62,21 @@ class TSADefense(BackdoorDefense):
         source_dataset = self.dataset.get_dataset('train', class_list=source_class)
         source_loader = self.dataset.get_dataloader(mode='train', dataset=source_dataset)
 
-        self.calc_tsa_distance(attack=self.attack, loader=source_loader)
+        probs_diff, diff_norm = self.calc_tsa_distance(attack=self.attack, loader=source_loader)
+        print('L0-norm of mark:', diff_norm[0])
+        print('L1-norm of mark:', diff_norm[1])
+        print('L2-norm of mark:', diff_norm[2])
 
     @torch.no_grad()
     def calc_tsa_distance(self, attack, loader):
         probs_diff_list = list()
         src_probs_list = list()
         tgt_probs_list = list()
+        input_diff_list = list()
         for data in loader:
             _input, _label = attack.model.get_data(data)
             trigger_input = attack.mark.add_mark(_input)
+            input_diff = trigger_input - _input
             trigger_output = attack.model(trigger_input)
             trigger_probs = F.softmax(trigger_output, dim=-1)
             benign_output = self.benign_model(trigger_input)
@@ -91,12 +92,30 @@ class TSADefense(BackdoorDefense):
             probs_diff_list.append(probs_diff.detach().cpu().numpy())
             src_probs_list.append(src_probs.detach().cpu().numpy())
             tgt_probs_list.append(tgt_probs.detach().cpu().numpy())
+            input_diff_list.append(input_diff.detach().cpu().numpy())
         probs_diff_list = np.concatenate(probs_diff_list)
         src_probs_list = np.concatenate(src_probs_list)
         tgt_probs_list = np.concatenate(tgt_probs_list)
+        input_diff_list = np.concatenate(input_diff_list)
         prob_diff = np.mean(probs_diff_list)
         src_prob = np.mean(src_probs_list)
         tgt_prob = np.mean(tgt_probs_list)
-        print(prob_diff, src_prob, tgt_prob)
-        return prob_diff
+
+        print('prob_diff:', prob_diff)
+        print('src_prob:', src_prob)
+        print('tgt_prob:', tgt_prob)
+
+        diff_norm = np.zeros(3)
+        for input_diff in input_diff_list:
+            for o in range(3):
+                _max = float('-inf')
+                for c in range(3):
+                    if o == 0:
+                        _norm = np.sum(input_diff[c] > 0)
+                    else:
+                        _norm = np.linalg.norm(input_diff[c], ord=o)
+                    _max = max(_norm, _max)
+                diff_norm[o] += _max
+        diff_norm /= len(input_diff_list)
+        return prob_diff, diff_norm
 

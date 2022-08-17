@@ -112,7 +112,6 @@ class SCAn(TrainingFiltering):
         poison_repr, poison_label = self.get_repr(self.poison_set)
         print('poison representations', poison_repr.shape)
 
-
         def_rst['class_rst'] = list()
 
         a = [0] * num_classes
@@ -195,7 +194,7 @@ class SCAn_Agent:
         X = reprs - mean_a
 
         if reduce_dim:
-            projector = PCA(n_components=reduce_dim)
+            projector = PCA(n_components=reduce_dim, svd_solver='full')
             X = projector.fit_transform(X)
             print('clean representations deduce to', X.shape)
 
