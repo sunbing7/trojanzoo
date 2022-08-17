@@ -27,10 +27,6 @@ if __name__ == '__main__':
     model = trojanvision.models.create(dataset=dataset, **kwargs)
     trainer = trojanvision.trainer.create(dataset=dataset, model=model, **kwargs)
 
-    img_size = dataset.data_shape[1:3]
-    kwargs['mark_height'] = img_size[0]
-    kwargs['mark_width'] = img_size[1]
-    kwargs['mark_random_init'] = True
     mark = trojanvision.marks.create(dataset=dataset, **kwargs)
     attack = trojanvision.attacks.create(dataset=dataset, model=model, mark=mark, **kwargs)
     kwargs['benign_model'] = benign_model

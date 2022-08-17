@@ -55,6 +55,10 @@ class TSADefense(BackdoorDefense):
     def detect(self, **kwargs):
         super().detect(**kwargs)
 
+        print('L0-norm of mark:', self.attack.mark.mark[-1].norm(p=0).item())
+        print('L1-norm of mark:', self.attack.mark.mark[-1].norm(p=1).item())
+        print('L2-norm of mark:', self.attack.mark.mark[-1].norm(p=2).item())
+
         source_class = self.attack.source_class or list(range(self.dataset.num_classes))
         source_class = source_class.copy()
         if self.attack.target_class in source_class:
@@ -94,6 +98,5 @@ class TSADefense(BackdoorDefense):
         src_prob = np.mean(src_probs_list)
         tgt_prob = np.mean(tgt_probs_list)
         print(prob_diff, src_prob, tgt_prob)
-        exit(0)
         return prob_diff
 

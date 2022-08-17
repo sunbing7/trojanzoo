@@ -1,20 +1,10 @@
 #!/usr/bin/env python3
 
 from ...abstract import TrainingFiltering
-from trojanvision.environ import env
-
-import torch
-from sklearn.decomposition import FastICA, PCA
-from sklearn.cluster import KMeans, MiniBatchKMeans
-from sklearn.metrics import silhouette_score
-from tqdm import tqdm
 
 from typing import TYPE_CHECKING
 import argparse
-from collections.abc import Callable
-
-if TYPE_CHECKING:
-    import torch.utils.data
+import os
 
 import numpy as np
 import torch
@@ -22,6 +12,11 @@ import time
 import math
 from trojanzoo.utils.data import TensorListDataset, sample_batch
 from sklearn.decomposition import PCA
+import pickle
+
+if TYPE_CHECKING:
+    import torch.utils.data
+
 
 EPS = 1e-5
 
@@ -83,6 +78,7 @@ class SCAn(TrainingFiltering):
         return repr_list, label_list
 
     def detect(self, **kwargs):
+        def_rst = dict()
         num_classes = self.dataset.num_classes
         clean_repr, clean_label = self.get_repr(self.clean_set)
         print('clean representations', clean_repr.shape)
@@ -95,6 +91,8 @@ class SCAn(TrainingFiltering):
         self.global_model = self.scan.build_global_model(clean_repr, clean_label, num_classes, reduce_dim=reduce_dim)
         ed_time = time.time()
         print('global model has been built in {:.3f} seconds'.format(ed_time - st_time))
+
+        def_rst['global_model'] = self.global_model
 
         '''
         st_time = time.time()
@@ -114,8 +112,9 @@ class SCAn(TrainingFiltering):
         poison_repr, poison_label = self.get_repr(self.poison_set)
         print('poison representations', poison_repr.shape)
 
-        # a = [cls_rst[cls]['sc'] for cls in range(num_classes)]
-        # print(a)
+
+        def_rst['class_rst'] = list()
+
         a = [0] * num_classes
         for tgt in range(num_classes):
             _poison_repr = poison_repr[poison_label == tgt]
@@ -137,11 +136,14 @@ class SCAn(TrainingFiltering):
             ed_time = time.time()
             print(tgt, 'local model has been built in {:.3f} seconds'.format(ed_time - st_time))
 
+            def_rst['class_rst'].append(rst)
             a[tgt] = rst['sc']
 
         print(a)
         class_scores = self.scan.calc_anomaly_index(a / np.max(a))
         print(class_scores)
+
+        def_rst['class_scores'] = class_scores
 
         suspicious_classes = list()
         for c, sc in enumerate(class_scores):
@@ -151,6 +153,12 @@ class SCAn(TrainingFiltering):
         if len(suspicious_classes) == 0:
             suspicious_classes = None
         print('suspicious classes: ', suspicious_classes)
+
+        # --------------------------- save defense results ----------------------------
+        file_path = os.path.normpath(os.path.join(
+            self.folder_path, self.get_filename() + '.pkl'))
+        with open(file_path, 'wb') as fh:
+            pickle.dump(def_rst, fh)
 
         return suspicious_classes
 
