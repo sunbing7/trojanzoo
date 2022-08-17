@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import random
 import math
 import numpy as np
+import os
 
 from typing import TYPE_CHECKING
 import argparse
@@ -31,7 +32,7 @@ class TSABackdoor(BackdoorAttack):
                                 '(default: 200)')
         group.add_argument('--train_poison_epochs', type=int,
                            help='epochs to train poison model'
-                                '(default: 10)')
+                                '(default: 30)')
         group.add_argument('--train_mark_lr', type=float,
                            help='learning rate for trigger training'
                                 '(default: 0.1)')
@@ -49,7 +50,7 @@ class TSABackdoor(BackdoorAttack):
     def __init__(self,
                  train_mark_epochs: int = 200,
                  train_mark_lr: float = 1.0,
-                 train_poison_epochs: int = 10,
+                 train_poison_epochs: int = 30,
                  alpha: float = 0.3,
                  lp_norm: float = 2,
                  tsa_patience: int = 5,
@@ -342,3 +343,12 @@ class TSABackdoor(BackdoorAttack):
                       _output: torch.Tensor = None, loss_fn: Callable[..., torch.Tensor] = None,
                       **kwargs) -> torch.Tensor:
         raise NotImplementedError
+
+    def get_filename(self, **kwargs) -> str:
+        r"""Get filenames for current attack settings."""
+        target_class = self.target_class
+        source_class = self.source_class
+        _file = 'alpha{alpha:.1f}_tgt{target:d}_src{src}_norm{norm}'.format(
+            alpha=self.alpha, target=target_class, src=source_class, norm=self.lp_norm)
+        return _file
+
