@@ -7,6 +7,8 @@ from ...abstract import BackdoorAttack
 from trojanvision.environ import env
 from trojanzoo.utils.logger import MetricLogger
 from trojanzoo.utils.output import ansi, get_ansi_len, output_iter
+from trojanzoo.utils.data import TensorListDataset, sample_batch
+from trojanzoo.environ import env
 
 import torch
 import torch.nn.functional as F
@@ -74,8 +76,15 @@ class WasserteinBackdoor(BackdoorAttack):
 
         assert len(self.model._model.classifier) == 1
 
+        source_class = self.source_class or list(range(self.dataset.num_classes))
+        source_class = source_class.copy()
+        if self.target_class in source_class:
+            source_class.remove(self.target_class)
+        if self.source_class is None:
+            self.source_class = source_class
+
     def attack(self, **kwargs):
-        other_set = self.sample_data()
+        other_set = self.get_source_class_dataset()
         other_loader = self.dataset.get_dataloader(mode='train', dataset=other_set)
 
         print('Step one')
@@ -162,7 +171,7 @@ class WasserteinBackdoor(BackdoorAttack):
             self.trigger_generator.eval()
         optimizer.zero_grad()
 
-    def sample_data(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
+    def get_source_class_dataset(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
         source_class = self.source_class or list(range(self.dataset.num_classes))
         source_class = source_class.copy()
         if self.target_class in source_class:
@@ -290,7 +299,30 @@ class WasserteinBackdoor(BackdoorAttack):
                            poison_num: int = None,
                            seed: int = None
                            ) -> torch.utils.data.Dataset:
-        raise NotImplementedError
+        if seed is None:
+            seed = env['data_seed']
+        torch.random.manual_seed(seed)
+        train_set = self.dataset.loader['train'].dataset
+        poison_num = poison_num or round(self.poison_ratio * len(train_set))
+
+        dataset = self.get_source_class_dataset()
+        dataset, _ = self.dataset.split_dataset(dataset, length=poison_num)
+        loader = self.dataset.get_dataloader('train', dataset=dataset)
+
+        _label_list = list()
+        _trigger_input_list = list()
+        for data in loader:
+            _input, _label = self.model.get_data(data)
+            _trigger_input = self.add_mark(_input)
+            _label_list.append(_label.detach().cpu())
+            _trigger_input_list.append(_trigger_input.detach().cpu())
+        _trigger_input = torch.cat(_trigger_input_list)
+        _label = torch.cat(_label_list)
+        _label = _label.tolist()
+
+        if poison_label:
+            _label = [self.target_class] * len(_label)
+        return TensorListDataset(_trigger_input, _label)
 
 
 class Block(nn.Module):
