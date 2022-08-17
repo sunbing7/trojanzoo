@@ -91,10 +91,7 @@ class WasserteinBackdoor(BackdoorAttack):
     def train_poison_model(self, **kwargs):
         self.trigger_generator.eval()
         self.model.train()
-        old_epochs = kwargs['epochs']
-        kwargs['epochs'] = self.train_poison_epochs
         ret = super().attack(**kwargs)
-        kwargs['epochs'] = old_epochs
         return ret
 
     def get_trigger_noise(self, _input: torch.Tensor) -> torch.Tensor:
