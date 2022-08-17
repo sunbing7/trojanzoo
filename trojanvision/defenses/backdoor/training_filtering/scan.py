@@ -71,6 +71,11 @@ class SCAn(TrainingFiltering):
         label_list = list()
         model = self.attack.model
         model.eval()
+
+        # from trojanzoo.utils.model import get_layer_name
+        # print(get_layer_name(model._model, use_filter=False, non_leaf=True))
+        # exit(0)
+
         for data in loader:
             _input, _label = model.get_data(data)
             repr = model.get_layer(_input, layer_output=self.repr_layer)
