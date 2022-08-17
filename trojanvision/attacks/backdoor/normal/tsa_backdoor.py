@@ -348,7 +348,7 @@ class TSABackdoor(BackdoorAttack):
         r"""Get filenames for current attack settings."""
         target_class = self.target_class
         source_class = self.source_class
-        _file = 'alpha{alpha:.1f}_tgt{target:d}_src{src}_norm{norm}'.format(
+        _file = 'alpha{alpha:.1f}_tgt{target:d}_src{src}_norm{norm:.0f}'.format(
             alpha=self.alpha, target=target_class, src=source_class, norm=self.lp_norm)
         return _file
 
