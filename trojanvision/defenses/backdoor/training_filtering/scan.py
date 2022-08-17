@@ -189,6 +189,7 @@ class SCAn_Agent:
         if reduce_dim:
             projector = PCA(n_components=reduce_dim)
             X = projector.fit_transform(X)
+            print('clean representations deduce to', X.shape)
 
         N = X.shape[0]  # num_samples
         M = X.shape[1]  # len_features
