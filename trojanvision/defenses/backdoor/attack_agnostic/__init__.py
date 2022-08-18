@@ -7,8 +7,9 @@ from .magnet import MagNet
 from .randomized_smooth import RandomizedSmooth
 from .recompress import Recompress
 from .tsa_defense import TSADefense
+from .seam import SEAM
 
-__all__ = ['AdvTrain', 'FinePruning', 'MagNet', 'RandomizedSmooth', 'Recompress', 'TSADefense']
+__all__ = ['AdvTrain', 'FinePruning', 'MagNet', 'RandomizedSmooth', 'Recompress', 'TSADefense', 'SEAM']
 
 class_dict: dict[str, type[BackdoorDefense]] = {
     'adv_train': AdvTrain,
@@ -17,4 +18,5 @@ class_dict: dict[str, type[BackdoorDefense]] = {
     'randomized_smooth': RandomizedSmooth,
     'recompress': Recompress,
     'tsa_defense': TSADefense,
+    'seam': SEAM,
 }
