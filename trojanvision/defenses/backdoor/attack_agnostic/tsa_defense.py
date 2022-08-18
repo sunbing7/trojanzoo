@@ -110,10 +110,7 @@ class TSADefense(BackdoorDefense):
             for o in range(3):
                 _max = float('-inf')
                 for c in range(3):
-                    if o == 0:
-                        _norm = np.sum(input_diff[c] > 0)
-                    else:
-                        _norm = np.linalg.norm(input_diff[c], ord=o)
+                    _norm = np.linalg.norm(input_diff[c].flatten(), ord=o)
                     _max = max(_norm, _max)
                 diff_norm[o] += _max
         diff_norm /= len(input_diff_list)
