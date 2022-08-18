@@ -4,7 +4,6 @@ import os
 
 from ...abstract import BackdoorAttack
 
-from trojanvision.environ import env
 from trojanzoo.utils.logger import MetricLogger
 from trojanzoo.utils.output import ansi, get_ansi_len, output_iter
 from trojanzoo.utils.data import TensorListDataset, sample_batch
