@@ -10,8 +10,9 @@ from .trojannet import TrojanNet
 from .wasserstein_backdoor import WasserteinBackdoor
 from .tsa_backdoor import TSABackdoor
 from .gate_backdoor import GateBackdoor
+from .wanet import WaNet
 
-__all__ = ['BadNet', 'TrojanNN', 'LatentBackdoor', 'IMC', 'TrojanNet', 'WasserteinBackdoor', 'TSABackdoor', 'GateBackdoor']
+__all__ = ['BadNet', 'TrojanNN', 'LatentBackdoor', 'IMC', 'TrojanNet', 'WasserteinBackdoor', 'TSABackdoor', 'GateBackdoor', 'WaNet']
 
 class_dict: dict[str, type[BackdoorAttack]] = {
     'badnet': BadNet,
@@ -22,4 +23,5 @@ class_dict: dict[str, type[BackdoorAttack]] = {
     'wasserstein_backdoor': WasserteinBackdoor,
     'tsa_backdoor': TSABackdoor,
     'gate_backdoor': GateBackdoor,
+    'wanet': WaNet,
 }

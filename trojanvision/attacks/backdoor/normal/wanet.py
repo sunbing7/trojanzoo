@@ -12,6 +12,7 @@ from ...abstract import BackdoorAttack
 import torch
 import torch.nn.functional as F
 from trojanvision.environ import env
+import argparse
 
 from trojanzoo.utils.data import TensorListDataset
 
@@ -80,19 +81,19 @@ class WaNet(BackdoorAttack):
 
         self.param_list['wanet'] = ['wanet_k', 'wanet_s', 'wanet_pa', 'wanet_pn']
 
-        self.k = wanet_k
-        self.s = wanet_s
+        self.wanet_k = wanet_k
+        self.wanet_s = wanet_s
 
         assert wanet_pa+wanet_pn <= 0.5
         tp = (wanet_pa + wanet_pn) / (1 - wanet_pa - wanet_pn)
-        self.pa = wanet_pa / (wanet_pa + wanet_pn) * tp
-        self.pn = wanet_pn / (wanet_pa + wanet_pn) * tp
+        self.wanet_pa = wanet_pa / (wanet_pa + wanet_pn) * tp
+        self.wanet_pn = wanet_pn / (wanet_pa + wanet_pn) * tp
 
         self.input_channels = self.dataset.data_shape[0]
         self.input_height = self.dataset.data_shape[1]
 
-        self.noise_grid, self.identity_grid = prepare_grid(k=self.k, input_height=self.input_height, device=env['device'])
-        grid_temps = (self.identity_grid + self.s * self.noise_grid / self.input_height) # * 0.98 to avoid go outside of [-1,1]
+        self.noise_grid, self.identity_grid = prepare_grid(k=self.wanet_k, input_height=self.input_height, device=env['device'])
+        grid_temps = (self.identity_grid + self.wanet_s * self.noise_grid / self.input_height) # * 0.98 to avoid go outside of [-1,1]
         self.grid_temps = torch.clamp(grid_temps, -1, 1)
 
     def get_source_inputs_index(self, _label):
@@ -117,12 +118,20 @@ class WaNet(BackdoorAttack):
         n = len(x)
         repeated_grid_temps = self.grid_temps.repeat(n, 1, 1, 1)
         if not add_noise:
-            return F.grid_sample(x, repeated_grid_temps, align_corners=True)
+            ret_x = F.grid_sample(x, repeated_grid_temps, align_corners=True)
         else:
             ins = torch.rand(n, self.input_height, self.input_height, 2).to(env['device']) * 2 - 1
             grid_temps2 = repeated_grid_temps + ins / self.input_height
             grid_temps2 = torch.clamp(grid_temps2, -1, 1)
-            return F.grid_sample(x, grid_temps2, align_corners=True)
+            ret_x = F.grid_sample(x, grid_temps2, align_corners=True)
+
+        # from torchvision.transforms import ToPILImage
+        # t_fn = ToPILImage()
+        # z = t_fn(ret_x[0])
+        # z.show()
+        # exit(0)
+
+        return ret_x
 
     def get_data(self, data: tuple[torch.Tensor, torch.Tensor],
                  org: bool = False, keep_org: bool = True,
@@ -132,11 +141,11 @@ class WaNet(BackdoorAttack):
         _input, _label = self.model.get_data(data)
         if not org:
             if keep_org:
-                decimal, integer = math.modf(len(_label) * self.pa)
+                decimal, integer = math.modf(len(_label) * self.wanet_pa)
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:
                     integer += 1
-                decimal, cover = math.modf(len(_label) * self.pn)
+                decimal, cover = math.modf(len(_label) * self.wanet_pn)
                 cover = int(cover)
                 if random.uniform(0, 1) < decimal:
                     cover += 1
@@ -144,7 +153,7 @@ class WaNet(BackdoorAttack):
                 integer = len(_label)
             if not keep_org or integer:
                 src_idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
-                if np.sum(idx) <= 0:
+                if np.sum(src_idx) <= 0:
                     return _input, _label
                 src_idx = np.arange(len(_label))[src_idx]
                 idx = np.random.choice(src_idx, integer)
@@ -163,22 +172,26 @@ class WaNet(BackdoorAttack):
 
     def get_poison_dataset(self, poison_label: bool = True,
                            poison_num: int = None,
-                           seed: int = None
+                           seed: int = None,
                            ) -> torch.utils.data.Dataset:
         if seed is None:
             seed = env['data_seed']
         torch.random.manual_seed(seed)
         train_set = self.dataset.loader['train'].dataset
-        poison_num = poison_num or round(self.poison_ratio * len(train_set))
+        poison_num = poison_num or round(self.wanet_pa * len(train_set))
+        cover_num = round(self.wanet_pn * len(train_set))
 
         dataset = self.get_source_class_dataset()
         dataset, _ = self.dataset.split_dataset(dataset, length=poison_num)
-        loader = self.dataset.get_dataloader('train', dataset=dataset)
+        coverset, _ = self.dataset.split_dataset(dataset, length=cover_num)
+        mix_dataset = torch.utils.data.ConcatDataset([dataset, coverset])
+        loader = self.dataset.get_dataloader('train', dataset=mix_dataset)
 
         _label_list = list()
         _trigger_input_list = list()
         for data in loader:
-            _input, _label = self.model.get_data(data)
+            # _input, _label = self.model.get_data(data)
+            _input, _label = data
             _trigger_input = self.add_mark(_input)
             _label_list.append(_label.detach().cpu())
             _trigger_input_list.append(_trigger_input.detach().cpu())
