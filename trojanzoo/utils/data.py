@@ -219,8 +219,14 @@ def get_class_subset(dataset: Dataset,
         idx = np.array(dataset.indices)
         indices = idx[indices]
         dataset = dataset.dataset
-    _, targets = dataset_to_tensor(dataset=dataset)
-    idx_bool = np.isin(targets.numpy(), class_list)
+    if hasattr(dataset, 'targets'):
+        targets = dataset.targets
+        if hasattr(dataset,'target_transform') and dataset.target_transform is not None:
+            targets = [dataset.target_transform(t) for t in targets]
+        idx_bool = np.isin(np.asarray(targets), class_list)
+    else:
+        _, targets = dataset_to_tensor(dataset=dataset)
+        idx_bool = np.isin(targets.numpy(), class_list)
     idx = np.arange(len(dataset))[idx_bool]
     idx = np.intersect1d(idx, indices)
     return Subset(dataset, idx)
