@@ -384,6 +384,25 @@ class BackdoorAttack(Attack):
         jaccard_idx = len(clean_idx & poison_idx) / len(clean_idx | poison_idx)
         return jaccard_idx
 
+    def get_source_class_dataset(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
+        source_class = self.source_class or list(range(self.dataset.num_classes))
+        source_class = source_class.copy()
+        if self.target_class in source_class:
+            source_class.remove(self.target_class)
+        dataset = self.dataset.get_dataset('train', class_list=source_class)
+        return dataset
+
+    def get_source_inputs_index(self, _label):
+        idx = None
+        for c in self.source_class:
+            _idx = _label.eq(c)
+            if idx is None:
+                idx = _idx
+            else:
+                idx = torch.logical_or(idx, _idx)
+        return idx
+
+
 
 class CleanLabelBackdoor(BackdoorAttack):
     r"""Backdoor attack abstract class of clean label.

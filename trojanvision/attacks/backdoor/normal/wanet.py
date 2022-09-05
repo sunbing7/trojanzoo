@@ -203,6 +203,15 @@ class WaNet(BackdoorAttack):
             _label = [self.target_class] * len(_label)
         return TensorListDataset(_trigger_input, _label)
 
+    def get_filename(self, **kwargs) -> str:
+        r"""Get filenames for current attack settings."""
+        target_class = self.target_class
+        source_class = self.source_class
+        _file = 'tgt{target:d}_src{src}_k{k:d}_s{s:.1f}'.format(
+            target=target_class, src=source_class, k=self.wanet_k, s=self.wanet_s)
+        return _file
+
+
 
 
 
