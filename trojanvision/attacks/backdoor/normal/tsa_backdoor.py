@@ -295,23 +295,23 @@ class TSABackdoor(BackdoorAttack):
         _input, _label = self.model.get_data(data)
         if not org:
             if keep_org:
-                decimal, integer = math.modf(len(_label) * self.poison_ratio)
+                src_idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
+                if np.sum(src_idx) <= 0:
+                    return _input, _label
+                src_idx = np.arange(len(_label))[src_idx]
+
+                decimal, integer = math.modf(len(src_idx) * self.poison_ratio)
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:
                     integer += 1
             else:
+                src_idx = np.arange(len(_label))
                 integer = len(_label)
             if not keep_org or integer:
-                idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
-                if np.sum(idx) <= 0:
-                    return _input, _label
-                idx = np.arange(len(idx))[idx]
-                idx = np.random.choice(idx, integer)
                 org_input, org_label = _input, _label
-                _input = self.add_mark(org_input[idx])
-                _label = org_label[idx]
+                _input = self.add_mark(org_input[src_idx[:integer]])
+                _label = org_label[src_idx[:integer]]
                 if poison_label:
-                    # _label = self.target_class * torch.ones_like(_label)
                     _label = self.get_trigger_label(_label)
                     org_label = F.one_hot(org_label, num_classes=self.dataset.num_classes)
                 if keep_org:
@@ -323,20 +323,7 @@ class TSABackdoor(BackdoorAttack):
                            poison_num: int = None,
                            seed: int = None
                            ) -> torch.utils.data.Dataset:
-        if seed is None:
-            seed = env['data_seed']
-        torch.random.manual_seed(seed)
-        train_set = self.dataset.loader['train'].dataset
-        poison_num = poison_num or round(self.poison_ratio * len(train_set))
-
-        dataset = self.dataset.get_dataset('train', class_list=self.source_class)
-        _input, _label = sample_batch(dataset, batch_size=poison_num)
-        _label = _label.tolist()
-
-        if poison_label:
-            _label = [self.target_class] * len(_label)
-        trigger_input = self.add_mark(_input)
-        return TensorListDataset(trigger_input, _label)
+        return super().get_poison_dataset_from_source_classes(poison_label, poison_num, seed)
 
     def loss_weighted(self, _input: torch.Tensor = None, _label: torch.Tensor = None,
                       _output: torch.Tensor = None, loss_fn: Callable[..., torch.Tensor] = None,

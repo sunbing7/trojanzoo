@@ -3,7 +3,7 @@
 r"""
 CUDA_VISIBLE_DEVICES=0 python examples/backdoor_attack.py --color --verbose 1 --pretrained --validate_interval 1 --epochs 10 --lr 0.01 --attack input_aware_dynamic
 """  # noqa: E501
-
+from trojanzoo.utils.data import TensorListDataset
 from ...abstract import BackdoorAttack
 
 from trojanzoo.environ import env
@@ -28,7 +28,7 @@ class LIRA(BackdoorAttack):
         super().add_argument(group)
         group.add_argument('--attack_model', type=str,
                            help='type of attack model autoencoder/unet'
-                           '(default: autoencoder)')
+                                '(default: autoencoder)')
         group.add_argument('--atkmodel_epochs', type=int,
                            help='epochs to train atkmodel'
                                 '(default: 10)')
@@ -37,13 +37,13 @@ class LIRA(BackdoorAttack):
                                 '(default: 0.01)')
         group.add_argument('--lr_atk', type=float,
                            help='learning rate of attack model'
-                           '(default: 0.0001)')
+                                '(default: 0.0001)')
         group.add_argument('--train_epoch', type=int,
                            help='train step in each epoch'
-                           '(default: 1)')
+                                '(default: 1)')
         group.add_argument('--attack_eps', type=float,
                            help='the most perturbation of noise added'
-                           '(default: 0.005)')
+                                '(default: 0.005)')
         return group
 
     def __init__(self,
@@ -76,8 +76,6 @@ class LIRA(BackdoorAttack):
         self.atkmodel, self.tgtmodel = self.create_atkmodel_tgtmodel()
         # todo parallel model
         self.tgtmodel.load_state_dict(self.atkmodel.state_dict(), strict=True)
-
-
 
     def create_atkmodel_tgtmodel(self):
         if self.attack_model == 'unet':
@@ -142,7 +140,8 @@ class LIRA(BackdoorAttack):
             loss_classifier.backward()
             clsoptimizer.step()
 
-            pbar.set_description('poison_loss:{:.2f} classifier_loss:{:.2f}'.format(loss_poison.item(), loss_classifier.item()))
+            pbar.set_description(
+                'poison_loss:{:.2f} classifier_loss:{:.2f}'.format(loss_poison.item(), loss_classifier.item()))
 
         avg_poison_loss = np.average(np.asarray(loss_poison_list))
         avg_classifier_loss = np.average(np.asarray(loss_classifier_list))
@@ -168,14 +167,28 @@ class LIRA(BackdoorAttack):
             if validate_interval != 0 and (_epoch % validate_interval == 0 or _epoch == epochs):
                 validate_result = self.validate_fn(verbose=verbose)
                 cur_asr, cur_acc = validate_result[0], validate_result[1]
-                if cur_acc > best_acc or (cur_asr > best_asr and cur_acc > (best_acc-5.0)):
+                if cur_acc > best_acc or (cur_asr > best_asr and cur_acc > (best_acc - 5.0)):
                     best_validate_result = validate_result
                     best_asr = cur_asr
                     best_acc = cur_acc
                     if save:
                         self.save()
 
-        super().attack(epochs=epochs, optimizer=optimizer, lr_scheduler=lr_scheduler, validate_interval=validate_interval, save=save, verbose=verbose, **kwargs)
+        super().attack(epochs=epochs, optimizer=optimizer, lr_scheduler=lr_scheduler,
+                       validate_interval=validate_interval, save=save, verbose=verbose, **kwargs)
+
+    def get_data(self, data: tuple[torch.Tensor, torch.Tensor],
+                 org: bool = False, keep_org: bool = True,
+                 poison_label: bool = True, **kwargs
+                 ) -> tuple[torch.Tensor, torch.Tensor]:
+
+        return super().get_data_from_source_classes(data, org, keep_org, poison_label, **kwargs)
+
+    def get_poison_dataset(self, poison_label: bool = True,
+                           poison_num: int = None,
+                           seed: int = None
+                           ) -> torch.utils.data.Dataset:
+        return super().get_poison_dataset_from_source_classes(poison_label, poison_num, seed)
 
     def save(self, filename: str = None, **kwargs):
         r"""Save attack results to files."""

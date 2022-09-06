@@ -116,6 +116,8 @@ class WaNet(BackdoorAttack):
 
     def add_mark(self, x: torch.Tensor, add_noise=False, **kwargs) -> torch.Tensor:
         n = len(x)
+        if n <= 0:
+            return x
         repeated_grid_temps = self.grid_temps.repeat(n, 1, 1, 1)
         if not add_noise:
             ret_x = F.grid_sample(x, repeated_grid_temps, align_corners=True)
@@ -141,31 +143,31 @@ class WaNet(BackdoorAttack):
         _input, _label = self.model.get_data(data)
         if not org:
             if keep_org:
-                decimal, integer = math.modf(len(_label) * self.wanet_pa)
-                integer = int(integer)
-                if random.uniform(0, 1) < decimal:
-                    integer += 1
-                decimal, cover = math.modf(len(_label) * self.wanet_pn)
-                cover = int(cover)
-                if random.uniform(0, 1) < decimal:
-                    cover += 1
-            else:
-                integer = len(_label)
-            if not keep_org or integer:
                 src_idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
                 if np.sum(src_idx) <= 0:
                     return _input, _label
                 src_idx = np.arange(len(_label))[src_idx]
-                idx = np.random.choice(src_idx, integer)
+
+                decimal, integer = math.modf(len(src_idx) * self.wanet_pa)
+                integer = int(integer)
+                if random.uniform(0, 1) < decimal:
+                    integer += 1
+                decimal, cover = math.modf(len(src_idx) * self.wanet_pn)
+                cover = int(cover)
+                if random.uniform(0, 1) < decimal:
+                    cover += 1
+            else:
+                src_idx = np.arange(len(_label))
+                integer = len(_label)
+            if not keep_org or integer:
                 org_input, org_label = _input, _label
-                _input = self.add_mark(org_input[idx])
-                _label = org_label[idx]
+                _input = self.add_mark(org_input[src_idx[:integer]])
+                _label = org_label[src_idx[:integer]]
                 if poison_label:
                     _label = self.target_class * torch.ones_like(_label)
                 if keep_org:
-                    idx = np.random.choice(src_idx, cover)
-                    _cover = self.add_mark(org_input[idx], add_noise=True)
-                    _cover_label = org_label[idx]
+                    _cover = self.add_mark(org_input[src_idx[integer:integer+cover]], add_noise=True)
+                    _cover_label = org_label[src_idx[integer:integer+cover]]
                     _input = torch.cat((_input, _cover, org_input))
                     _label = torch.cat((_label, _cover_label, org_label))
         return _input, _label
@@ -177,31 +179,32 @@ class WaNet(BackdoorAttack):
         if seed is None:
             seed = env['data_seed']
         torch.random.manual_seed(seed)
-        train_set = self.dataset.loader['train'].dataset
-        poison_num = poison_num or round(self.wanet_pa * len(train_set))
-        cover_num = round(self.wanet_pn * len(train_set))
+        src_dataset = self.get_source_class_dataset()
+        poison_num = poison_num or round(self.wanet_pa * len(src_dataset))
+        cover_num = round(self.wanet_pn * len(src_dataset))
+        dataset, _ = self.dataset.split_dataset(src_dataset, length=poison_num)
+        loader = self.dataset.get_dataloader('train', dataset=dataset)
 
-        dataset = self.get_source_class_dataset()
-        dataset, _ = self.dataset.split_dataset(dataset, length=poison_num)
-        coverset, _ = self.dataset.split_dataset(dataset, length=cover_num)
-        mix_dataset = torch.utils.data.ConcatDataset([dataset, coverset])
-        loader = self.dataset.get_dataloader('train', dataset=mix_dataset)
-
-        _label_list = list()
-        _trigger_input_list = list()
-        for data in loader:
-            # _input, _label = self.model.get_data(data)
-            _input, _label = data
-            _trigger_input = self.add_mark(_input)
-            _label_list.append(_label.detach().cpu())
-            _trigger_input_list.append(_trigger_input.detach().cpu())
-        _trigger_input = torch.cat(_trigger_input_list)
-        _label = torch.cat(_label_list)
-        _label = _label.tolist()
-
+        def trans_fn(data):
+            _input, _label = self.model.get_data(data)
+            _input = self.add_mark(_input)
+            return _input, _label
+        _input_tensor, _label_list = self.expand_loader_to_tensor_and_list(loader, trans_fn=trans_fn)
         if poison_label:
-            _label = [self.target_class] * len(_label)
-        return TensorListDataset(_trigger_input, _label)
+            _label_list = [self.target_class] * len(_label_list)
+
+        coverset, _ = self.dataset.split_dataset(src_dataset, length=cover_num)
+        loader = self.dataset.get_dataloader('train', dataset=coverset)
+        def cover_fn(data):
+            _input, _label = self.model.get_data(data)
+            _input = self.add_mark(_input, add_noise=True)
+            return _input, _label
+        _cover_tensor, _cover_list = self.expand_loader_to_tensor_and_list(loader, trans_fn=cover_fn)
+
+        _input_tensor = torch.cat([_input_tensor, _cover_tensor])
+        _label_list.extend(_cover_list)
+
+        return TensorListDataset(_input_tensor, _label_list)
 
     def get_filename(self, **kwargs) -> str:
         r"""Get filenames for current attack settings."""

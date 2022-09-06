@@ -9,7 +9,6 @@ from trojanzoo.environ import env
 from trojanzoo.utils.data import TensorListDataset, sample_batch
 from trojanzoo.utils.logger import SmoothedValue
 
-
 import torch
 import torchvision.transforms.functional as F
 import numpy as np
@@ -75,16 +74,16 @@ class BackdoorAttack(Attack):
         super().add_argument(group)
         group.add_argument('--target_class', type=int,
                            help='target class of backdoor '
-                           '(default: 0)')
+                                '(default: 0)')
         group.add_argument('--source_class', type=int, nargs='+',
                            help='source class(es) of backdoor '
-                           '(default: 1)')
+                                '(default: 1)')
         group.add_argument('--poison_percent', type=float,
                            help='malicious training data proportion '
-                           '(default: 0.01)')
+                                '(default: 0.01)')
         group.add_argument('--train_mode', choices=['batch', 'dataset', 'loss'],
                            help='training mode to inject backdoor '
-                           '(default: "batch")')
+                                '(default: "batch")')
         return group
 
     def __init__(self, mark: Watermark = None,
@@ -384,17 +383,24 @@ class BackdoorAttack(Attack):
         jaccard_idx = len(clean_idx & poison_idx) / len(clean_idx | poison_idx)
         return jaccard_idx
 
+    def get_source_class(self):
+        if self.source_class is None:
+            source_class = self.source_class or list(range(self.dataset.num_classes))
+            if self.target_class in source_class:
+                source_class.remove(self.target_class)
+            self.source_class = source_class
+        return self.source_class
+
     def get_source_class_dataset(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
-        source_class = self.source_class or list(range(self.dataset.num_classes))
-        source_class = source_class.copy()
-        if self.target_class in source_class:
-            source_class.remove(self.target_class)
+        source_class = self.get_source_class()
         dataset = self.dataset.get_dataset('train', class_list=source_class)
         return dataset
 
-    def get_source_inputs_index(self, _label):
+    def get_source_inputs_index(self, _label, source_class=None):
+        if source_class is None:
+            source_class = self.get_source_class()
         idx = None
-        for c in self.source_class:
+        for c in source_class:
             _idx = _label.eq(c)
             if idx is None:
                 idx = _idx
@@ -402,6 +408,73 @@ class BackdoorAttack(Attack):
                 idx = torch.logical_or(idx, _idx)
         return idx
 
+    def get_data_from_source_classes(self, data: tuple[torch.Tensor, torch.Tensor],
+                                     org: bool = False, keep_org: bool = True,
+                                     poison_label: bool = True, **kwargs
+                                     ) -> tuple[torch.Tensor, torch.Tensor]:
+
+        _input, _label = self.model.get_data(data)
+        if not org:
+            if keep_org:
+                src_idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
+                if np.sum(src_idx) <= 0:
+                    return _input, _label
+                src_idx = np.arange(len(_label))[src_idx]
+
+                decimal, integer = math.modf(len(src_idx) * self.poison_ratio)
+                integer = int(integer)
+                if random.uniform(0, 1) < decimal:
+                    integer += 1
+            else:
+                src_idx = np.arange(len(_label))
+                integer = len(_label)
+            if not keep_org or integer:
+                org_input, org_label = _input, _label
+                _input = self.add_mark(org_input[src_idx[:integer]])
+                _label = org_label[src_idx[:integer]]
+                if poison_label:
+                    _label = self.target_class * torch.ones_like(_label)
+                if keep_org:
+                    _input = torch.cat((_input, org_input))
+                    _label = torch.cat((_label, org_label))
+        return _input, _label
+
+    def get_poison_dataset_from_source_classes(self, poison_label: bool = True,
+                                               poison_num: int = None,
+                                               seed: int = None
+                                               ) -> torch.utils.data.Dataset:
+        if seed is None:
+            seed = env['data_seed']
+        torch.random.manual_seed(seed)
+        dataset = self.get_source_class_dataset()
+        poison_num = poison_num or round(self.poison_ratio * len(dataset))
+        dataset, _ = self.dataset.split_dataset(dataset, length=poison_num)
+        loader = self.dataset.get_dataloader('train', dataset=dataset)
+
+        def trans_fn(data):
+            _input, _label = self.model.get_data(data)
+            _input = self.add_mark(_input)
+            return _input, _label
+
+        _input_tensor, _label_list = self.expand_loader_to_tensor_and_list(loader, trans_fn=trans_fn)
+
+        if poison_label:
+            _label_list = [self.target_class] * len(_label_list)
+        return TensorListDataset(_input_tensor, _label_list)
+
+    def expand_loader_to_tensor_and_list(self, loader, trans_fn=None):
+        _label_list = list()
+        _input_list = list()
+        if trans_fn is None:
+            trans_fn = self.model.get_data
+        for data in loader:
+            _input, _label = trans_fn(data)
+            _input_list.append(_input.detach().cpu())
+            _label_list.append(_label.detach().cpu())
+        _input_tensor = torch.cat(_input_list)
+        _label_list = torch.cat(_label_list)
+        _label_list = _label_list.tolist()
+        return _input_tensor, _label_list
 
 
 class CleanLabelBackdoor(BackdoorAttack):

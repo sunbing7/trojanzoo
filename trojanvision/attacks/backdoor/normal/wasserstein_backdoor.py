@@ -79,8 +79,7 @@ class WasserteinBackdoor(BackdoorAttack):
         source_class = source_class.copy()
         if self.target_class in source_class:
             source_class.remove(self.target_class)
-        if self.source_class is None:
-            self.source_class = source_class
+        self.source_class = source_class
 
     def attack(self, **kwargs):
         other_set = self.get_source_class_dataset()
@@ -264,30 +263,7 @@ class WasserteinBackdoor(BackdoorAttack):
                  poison_label: bool = True, **kwargs
                  ) -> tuple[torch.Tensor, torch.Tensor]:
 
-        _input, _label = self.model.get_data(data)
-        if not org:
-            if keep_org:
-                decimal, integer = math.modf(len(_label) * self.poison_ratio)
-                integer = int(integer)
-                if random.uniform(0, 1) < decimal:
-                    integer += 1
-            else:
-                integer = len(_label)
-            if not keep_org or integer:
-                idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
-                if np.sum(idx) <= 0:
-                    return _input, _label
-                idx = np.arange(len(idx))[idx]
-                idx = np.random.choice(idx, integer)
-                org_input, org_label = _input, _label
-                _input = self.add_mark(org_input[idx])
-                _label = org_label[idx]
-                if poison_label:
-                    _label = self.target_class * torch.ones_like(_label)
-                if keep_org:
-                    _input = torch.cat((_input, org_input))
-                    _label = torch.cat((_label, org_label))
-        return _input, _label
+        return super().get_data_from_source_classes(data, org, keep_org, poison_label, **kwargs)
 
     def loss_weighted(self, _input: torch.Tensor = None, _label: torch.Tensor = None,
                       _output: torch.Tensor = None, loss_fn: Callable[..., torch.Tensor] = None,
@@ -298,30 +274,8 @@ class WasserteinBackdoor(BackdoorAttack):
                            poison_num: int = None,
                            seed: int = None
                            ) -> torch.utils.data.Dataset:
-        if seed is None:
-            seed = env['data_seed']
-        torch.random.manual_seed(seed)
-        train_set = self.dataset.loader['train'].dataset
-        poison_num = poison_num or round(self.poison_ratio * len(train_set))
 
-        dataset = self.get_source_class_dataset()
-        dataset, _ = self.dataset.split_dataset(dataset, length=poison_num)
-        loader = self.dataset.get_dataloader('train', dataset=dataset)
-
-        _label_list = list()
-        _trigger_input_list = list()
-        for data in loader:
-            _input, _label = self.model.get_data(data)
-            _trigger_input = self.add_mark(_input)
-            _label_list.append(_label.detach().cpu())
-            _trigger_input_list.append(_trigger_input.detach().cpu())
-        _trigger_input = torch.cat(_trigger_input_list)
-        _label = torch.cat(_label_list)
-        _label = _label.tolist()
-
-        if poison_label:
-            _label = [self.target_class] * len(_label)
-        return TensorListDataset(_trigger_input, _label)
+        return super().get_poison_dataset_from_source_classes(poison_label, poison_num, seed)
 
 
 class Block(nn.Module):
