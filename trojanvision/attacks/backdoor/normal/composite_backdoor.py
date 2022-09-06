@@ -15,6 +15,7 @@ import torch.nn.functional as F
 from trojanzoo.environ import env
 
 import math
+import os
 
 class CompositeBackdoor(BackdoorAttack):
     name: str = 'composite_backdoor'
@@ -120,7 +121,7 @@ class CompositeBackdoor(BackdoorAttack):
                 if poison_label:
                     _label = self.target_class * torch.ones_like(_label)
                 if keep_org:
-                    _mix_input, _mix_label = self.mix_data(org_input[src_idx[integer:integer + mixnum]], org_label[src_idx[integer:integer + mixnum]])
+                    _mix_input, _mix_label = self.mix_data(org_input[:mixnum], org_label[:mixnum])
                     _input = torch.cat((_input, _mix_input, org_input))
                     _label = torch.cat((_label, _mix_label, org_label))
         return _input, _label
@@ -149,7 +150,8 @@ class CompositeBackdoor(BackdoorAttack):
         if poison_label:
             _label_list = [self.target_class] * len(_label_list)
 
-        mixset, _ = self.dataset.split_dataset(dataset, length=mix_num)
+        trainset = self.dataset.loader['train'].dataset
+        mixset, _ = self.dataset.split_dataset(trainset, length=mix_num)
         loader = self.dataset.get_dataloader('train', dataset=mixset)
 
         def mix_fn(data):
@@ -163,6 +165,30 @@ class CompositeBackdoor(BackdoorAttack):
         _label_list.extend(_cover_list)
 
         return TensorListDataset(_input_tensor, _label_list)
+
+    def get_filename(self, **kwargs) -> str:
+        r"""Get filenames for current attack settings."""
+        target_class = self.target_class
+        source_class = self.source_class
+        _file = 'tgt{target:d}_src{src}_classB{classB}'.format(
+            target=target_class, src=source_class, classB=self.classB)
+        return _file
+
+    def save(self, filename: str = None, **kwargs):
+        r"""Save attack results to files."""
+        filename = filename or self.get_filename(**kwargs)
+        file_path = os.path.join(self.folder_path, filename)
+        self.model.save(file_path + '.pth')
+        self.save_params(file_path + '.yaml')
+        print('attack results saved at: ', file_path)
+
+    def load(self, filename: str = None, **kwargs):
+        r"""Load attack results from previously saved files."""
+        filename = filename or self.get_filename(**kwargs)
+        file_path = os.path.join(self.folder_path, filename)
+        self.model.load(file_path + '.pth')
+        self.load_params(file_path + '.yaml')
+        print('attack results loaded from: ', file_path)
 
 
 class MixDataset(torch.utils.data.Dataset):
