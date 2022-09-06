@@ -56,10 +56,10 @@ class WaNet(BackdoorAttack):
                            help='clip strength: rand(wanet_k, wanet_k, 2) x wanet_s'
                            '(default: 0.5)')
         group.add_argument('--wanet_pa', type=float,
-                           help='ratio of attack images in training set'
+                           help='ratio of attack images, comparing to the number of inputs in source classes'
                                 '(default: 0.1)')
         group.add_argument('--wanet_pn', type=float,
-                           help='ratio of noise image in training set'
+                           help='ratio of noise image, comparing to the number of inputs in source classes'
                                 '(default: 0.2)')
         return group
 
@@ -84,10 +84,9 @@ class WaNet(BackdoorAttack):
         self.wanet_k = wanet_k
         self.wanet_s = wanet_s
 
-        assert wanet_pa+wanet_pn <= 0.5
-        tp = (wanet_pa + wanet_pn) / (1 - wanet_pa - wanet_pn)
-        self.wanet_pa = wanet_pa / (wanet_pa + wanet_pn) * tp
-        self.wanet_pn = wanet_pn / (wanet_pa + wanet_pn) * tp
+        assert max(wanet_pa, wanet_pn) <= 1.0
+        self.wanet_pa = wanet_pa
+        self.wanet_pn = wanet_pn
 
         self.input_channels = self.dataset.data_shape[0]
         self.input_height = self.dataset.data_shape[1]

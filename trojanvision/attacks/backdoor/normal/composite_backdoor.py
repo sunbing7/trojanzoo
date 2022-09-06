@@ -27,17 +27,17 @@ class CompositeBackdoor(BackdoorAttack):
                            help='class where benign features come from '
                                 '(default: 2)')
         group.add_argument('--mix_rate', type=float,
-                           help='percentages of data will be mixed '
-                                '(default: 0.4)')
+                           help='ratio of data will be mixed, comparing to the number of whole training inputs'
+                                '(default: 0.5)')
         group.add_argument('--poison_rate', type=float,
-                           help='percentages of data will be poisoned '
-                                '(default: 0.1)')
+                           help='ratio of data will be poisoned, comparing to the number of inputs in the source classes'
+                                '(default: 1.0)')
         return group
 
     def __init__(self,
                  classB: int = 2,
-                 mix_rate: float = 0.4,
-                 poison_rate: float = 0.1,
+                 mix_rate: float = 0.5,
+                 poison_rate: float = 1.0,
                  **kwargs):
         super().__init__(**kwargs)
 
@@ -48,17 +48,21 @@ class CompositeBackdoor(BackdoorAttack):
         self.classA = self.source_class
         self.classB = classB
         self.classC = self.target_class
-        rate_sum = mix_rate + poison_rate
-        assert rate_sum <= 0.5
-        self.mix_rate = mix_rate / (1 - rate_sum)
-        self.poison_rate = poison_rate / (1 - rate_sum)
+        assert max(mix_rate, poison_rate) <= 1.0
+        self.mix_rate = mix_rate
+        self.poison_rate = poison_rate
 
         self.mixer = HalfMixer()
         self.num_classes = self.dataset.num_classes
         self.class_sets = dict()
         for cls in range(self.num_classes):
             self.class_sets[cls] = self.dataset.get_dataset('train', class_list=[cls])
-        self.classB_set = self.class_sets[self.classB]
+
+    def define_criterion(self, **kwargs):
+        rules = self.classA
+        rules.extend([self.classB])
+        rules.extend([self.classC])
+        return CompositeLoss(rules=rules, simi_factor=1, mode='contrastive')
 
     def mix_input_from_class(self, x: torch.Tensor, cls: int):
         class_set = self.class_sets[cls]
@@ -107,7 +111,7 @@ class CompositeBackdoor(BackdoorAttack):
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:
                     integer += 1
-                decimal, mixnum = math.modf(len(src_idx) * self.mix_rate)
+                decimal, mixnum = math.modf(len(_label) * self.mix_rate)
                 mixnum = int(mixnum)
                 if random.uniform(0, 1) < decimal:
                     mixnum += 1
@@ -134,10 +138,9 @@ class CompositeBackdoor(BackdoorAttack):
         if seed is None:
             seed = env['data_seed']
         torch.random.manual_seed(seed)
+
         src_dataset = self.get_source_class_dataset()
         poison_num = poison_num or round(self.poison_rate * len(src_dataset))
-        mix_num = round(self.mix_rate * len(src_dataset))
-
         dataset, _ = self.dataset.split_dataset(src_dataset, length=poison_num)
         loader = self.dataset.get_dataloader('train', dataset=dataset)
 
@@ -151,6 +154,7 @@ class CompositeBackdoor(BackdoorAttack):
             _label_list = [self.target_class] * len(_label_list)
 
         trainset = self.dataset.loader['train'].dataset
+        mix_num = round(self.mix_rate * len(trainset))
         mixset, _ = self.dataset.split_dataset(trainset, length=mix_num)
         loader = self.dataset.get_dataloader('train', dataset=mixset)
 
@@ -497,6 +501,7 @@ class ContrastiveLoss(nn.Module):
         losses = 0.5 * (target.float() * distances +
                         (1 + -1 * target).float() * F.relu(self.margin - (distances + self.eps).sqrt()).pow(2))
         return losses.mean() if size_average else losses.sum()
+
 
 
 class CompositeLoss(nn.Module):
