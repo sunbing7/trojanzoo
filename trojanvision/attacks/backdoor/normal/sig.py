@@ -73,8 +73,8 @@ class SIG(BackdoorAttack):
         r"""Get filenames for current attack settings."""
         target_class = self.target_class
         source_class = self.source_class
-        _file = 'tar{target:d}_src{source}_delta{sig_delta}_f{sig_f}'.format(
-            target=target_class, source=source_class, sig_delta=self.sig_delta, sig_f=self.sig_f)
+        _file = 'tar{target:d}_src{source}_delta{sig_delta}_f{sig_f}_pr{pr}'.format(
+            target=target_class, source=source_class, sig_delta=self.sig_delta, sig_f=self.sig_f, pr=self.poison_percent)
         return _file
 
     def save(self, filename: str = None, **kwargs):

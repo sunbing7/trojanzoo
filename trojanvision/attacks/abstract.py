@@ -177,9 +177,11 @@ class BackdoorAttack(Attack):
             target_class = self.target_class
         mark_filename = os.path.split(self.mark.mark_path)[-1]
         mark_name, mark_ext = os.path.splitext(mark_filename)
-        _file = '{mark}_tar{target:d}_alpha{mark_alpha:.2f}_mark({mark_height:d},{mark_width:d})'.format(
+        _file = '{mark}_tar{target:d}_alpha{mark_alpha:.2f}_mark({mark_height:d},{mark_width:d})_pr{pr}'.format(
             mark=mark_name, target=target_class, mark_alpha=mark_alpha,
-            mark_height=self.mark.mark_height, mark_width=self.mark.mark_width)
+            mark_height=self.mark.mark_height, mark_width=self.mark.mark_width,
+            pr=self.poison_percent
+        )
         if self.mark.mark_random_pos:
             _file = 'randompos_' + _file
         if self.mark.mark_scattered:
