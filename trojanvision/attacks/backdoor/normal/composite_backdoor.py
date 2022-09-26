@@ -174,8 +174,8 @@ class CompositeBackdoor(BackdoorAttack):
         r"""Get filenames for current attack settings."""
         target_class = self.target_class
         source_class = self.source_class
-        _file = 'tgt{target:d}_src{src}_classB{classB}'.format(
-            target=target_class, src=source_class, classB=self.classB)
+        _file = 'tgt{target:d}_src{src}_classB{classB}_pr{pr}'.format(
+            target=target_class, src=source_class, classB=self.classB, pr=self.poison_rate)
         return _file
 
     def save(self, filename: str = None, **kwargs):
