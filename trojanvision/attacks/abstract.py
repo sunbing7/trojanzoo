@@ -393,9 +393,9 @@ class BackdoorAttack(Attack):
             self.source_class = source_class
         return self.source_class
 
-    def get_source_class_dataset(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
+    def get_source_class_dataset(self, mode='train') -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
         source_class = self.get_source_class()
-        dataset = self.dataset.get_dataset('train', class_list=source_class)
+        dataset = self.dataset.get_dataset(mode, class_list=source_class)
         return dataset
 
     def get_source_inputs_index(self, _label, source_class=None):
@@ -443,15 +443,16 @@ class BackdoorAttack(Attack):
 
     def get_poison_dataset_from_source_classes(self, poison_label: bool = True,
                                                poison_num: int = None,
-                                               seed: int = None
+                                               seed: int = None,
+                                               mode: str = 'train',
                                                ) -> torch.utils.data.Dataset:
         if seed is None:
             seed = env['data_seed']
         torch.random.manual_seed(seed)
-        dataset = self.get_source_class_dataset()
+        dataset = self.get_source_class_dataset(mode=mode)
         poison_num = poison_num or round(self.poison_ratio * len(dataset))
         dataset, _ = self.dataset.split_dataset(dataset, length=poison_num)
-        loader = self.dataset.get_dataloader('train', dataset=dataset)
+        loader = self.dataset.get_dataloader(mode, dataset=dataset)
 
         def trans_fn(data):
             _input, _label = self.model.get_data(data)
