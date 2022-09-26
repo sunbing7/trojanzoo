@@ -254,8 +254,8 @@ class WasserteinBackdoor(BackdoorAttack):
         r"""Get filenames for current attack settings."""
         target_class = self.target_class
         source_class = self.source_class
-        _file = 'wb_tar{target:d}_src{source}pgd{pgd_eps:.2f}'.format(
-            target=target_class, source=source_class, pgd_eps=self.pgd_eps)
+        _file = 'wb_tar{target:d}_src{source}pgd{pgd_eps:.2f}_pr{pr}'.format(
+            target=target_class, source=source_class, pgd_eps=self.pgd_eps, pr=self.poison_percent)
         return _file
 
     def get_data(self, data: tuple[torch.Tensor, torch.Tensor],
