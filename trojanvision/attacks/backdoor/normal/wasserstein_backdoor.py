@@ -169,12 +169,12 @@ class WasserteinBackdoor(BackdoorAttack):
             self.trigger_generator.eval()
         optimizer.zero_grad()
 
-    def get_source_class_dataset(self) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
+    def get_source_class_dataset(self, mode='train') -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
         source_class = self.source_class or list(range(self.dataset.num_classes))
         source_class = source_class.copy()
         if self.target_class in source_class:
             source_class.remove(self.target_class)
-        dataset = self.dataset.get_dataset('train', class_list=source_class)
+        dataset = self.dataset.get_dataset(mode, class_list=source_class)
         return dataset
 
     def get_source_inputs_index(self, _label):

@@ -135,7 +135,7 @@ class InputAwareDynamic(BackdoorAttack):
         group.add_argument('--cross_percent', type=float,
                            help='percentage of cross inputs '
                            'in the whole training set '
-                           '(default: 0.032)')
+                           '(default: 0.1)')
         group.add_argument('--natural', action='store_true',
                            help='whether to use natural backdoors. '
                            'if true, model parameters will be frozen')
