@@ -101,12 +101,12 @@ class CompositeBackdoor(BackdoorAttack):
 
         _input, _label = self.model.get_data(data)
         if not org:
-            if keep_org:
-                src_idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
-                if np.sum(src_idx) <= 0:
-                    return _input, _label
-                src_idx = np.arange(len(_label))[src_idx]
+            src_idx = self.get_source_inputs_index(_label).cpu().detach().numpy()
+            if np.sum(src_idx) <= 0:
+                return _input, _label
+            src_idx = np.arange(len(_label))[src_idx]
 
+            if keep_org:
                 decimal, integer = math.modf(len(src_idx) * self.poison_rate)
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:
@@ -116,8 +116,7 @@ class CompositeBackdoor(BackdoorAttack):
                 if random.uniform(0, 1) < decimal:
                     mixnum += 1
             else:
-                src_idx = np.arange(len(_label))
-                integer = len(_label)
+                integer = len(src_idx)
             if not keep_org or integer:
                 org_input, org_label = _input, _label
                 _input = self.add_mark(org_input[src_idx[:integer]])

@@ -162,6 +162,8 @@ class InputAwareDynamic(BackdoorAttack):
         self.poison_num = 0  # monkey patch: to avoid batch size change in badnet
         self.cross_percent = cross_percent
 
+        self.get_source_class()
+
         data_channel = self.dataset.data_shape[0]
         num_channels = [16, 32] if data_channel == 1 else [32, 64, 128]
         self.mark_generator = self.define_generator(
@@ -219,6 +221,8 @@ class InputAwareDynamic(BackdoorAttack):
             This method replaces some clean data with poison version,
             while BadNet's keeps the clean data and append poison version.
         """
+        return super().get_data_from_source_classes(data, org, keep_org, poison_label, **kwargs)
+
         _input, _label = self.model.get_data(data)
         if not org:
             if keep_org:

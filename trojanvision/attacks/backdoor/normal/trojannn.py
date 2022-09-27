@@ -97,6 +97,8 @@ class TrojanNN(BackdoorAttack):
         self.neuron_epoch = neuron_epoch
         self.neuron_num = neuron_num
 
+        self.get_source_class()
+
         self.neuron_idx: torch.Tensor = None
         self.background = torch.zeros(self.dataset.data_shape, device=env['device']).unsqueeze(0)
         # Original code: doesn't work on resnet18_comp

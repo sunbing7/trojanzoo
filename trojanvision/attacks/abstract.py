@@ -271,6 +271,8 @@ class BackdoorAttack(Attack):
         Returns:
             (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
         """
+        return self.get_data_from_source_classes(data, org, keep_org, poison_label, **kwargs)
+
         _input, _label = self.model.get_data(data)
         if not org:
             if keep_org:
