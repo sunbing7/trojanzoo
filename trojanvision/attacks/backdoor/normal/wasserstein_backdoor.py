@@ -104,7 +104,7 @@ class WasserteinBackdoor(BackdoorAttack):
     def get_trigger_noise(self, _input: torch.Tensor) -> torch.Tensor:
         raw_output = self.trigger_generator(_input)
         trigger_output = raw_output.tanh()/2.0 + 0.5
-        return trigger_output - raw_output
+        return trigger_output - _input
 
     def train_trigger_generator(self, other_loader, verbose: bool = True):
 
