@@ -19,8 +19,10 @@ from collections.abc import Callable, Iterable
 if TYPE_CHECKING:
     import torch.utils.data
 
+from trojanzoo.utils.output import ansi, get_ansi_len, output_iter
+from .wasserstein_backdoor import WasserteinBackdoor
 
-class TSABackdoor(BackdoorAttack):
+class TSABackdoor(WasserteinBackdoor):
     name: str = 'tsa_backdoor'
 
     @classmethod
@@ -29,9 +31,9 @@ class TSABackdoor(BackdoorAttack):
         group.add_argument('--train_mark_epochs', type=int,
                            help='epochs to train trigger'
                                 '(default: 200)')
-        group.add_argument('--train_poison_epochs', type=int,
-                           help='epochs to train poison model'
-                                '(default: 30)')
+        # group.add_argument('--train_poison_epochs', type=int,
+        #                    help='epochs to train poison model'
+        #                         '(default: 30)')
         group.add_argument('--train_mark_lr', type=float,
                            help='learning rate for trigger training'
                                 '(default: 0.1)')
@@ -49,22 +51,22 @@ class TSABackdoor(BackdoorAttack):
     def __init__(self,
                  train_mark_epochs: int = 200,
                  train_mark_lr: float = 1.0,
-                 train_poison_epochs: int = 30,
+                 # train_poison_epochs: int = 30,
                  alpha: float = 0.3,
                  lp_norm: float = 2,
                  tsa_patience: int = 5,
                  **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(train_trigger_epochs=50, pgd_eps=0.1, **kwargs)
 
         self.param_list['tsa_backdoor'] = ['train_mark_epochs',
-                                           'train_poison_epochs',
+                                           # 'train_poison_epochs',
                                            'train_mark_lr',
                                            'alpha',
                                            'lp_norm',
                                            'tsa_patience']
         self.train_mark_epochs = train_mark_epochs
         self.train_mark_lr = train_mark_lr
-        self.train_poison_epochs = train_poison_epochs
+        # self.train_poison_epochs = train_poison_epochs
         self.alpha = alpha
         self.lp_norm = lp_norm
         self.tsa_patience = tsa_patience
@@ -76,16 +78,20 @@ class TSABackdoor(BackdoorAttack):
         self.init_cost = 1e-3
         self.cost = 0.0
 
-        source_class = self.source_class or list(range(self.dataset.num_classes))
-        source_class = source_class.copy()
-        if self.target_class in source_class:
-            source_class.remove(self.target_class)
-        if self.source_class is None:
-            self.source_class = source_class
+        data_channel = self.dataset.data_shape[0]
+        image_size = self.dataset.data_shape[1]
+        self.trigger_generator = self.get_trigger_generator(in_channels=data_channel, image_size=image_size)
+
+        self.get_source_class()
 
     def attack(self, **kwargs):
-        source_set = self.sample_data()
+        source_set = self.get_source_class_dataset()
         source_loader = self.dataset.get_dataloader(mode='train', dataset=source_set)
+
+        self.train_trigger_generator(source_loader)
+
+        self.train_poison_model(**kwargs)
+        exit(0)
 
         print('Step one')
         mark_best, loss_best = self.optimize_mark(self.target_class, source_loader)
@@ -96,12 +102,67 @@ class TSABackdoor(BackdoorAttack):
 
         return ret
 
-    def train_poison_model(self, **kwargs):
-        old_epochs = kwargs['epochs']
-        kwargs['epochs'] = self.train_poison_epochs
-        ret = super().attack(**kwargs)
-        kwargs['epochs'] = old_epochs
-        return ret
+    # def train_poison_model(self, **kwargs):
+    #     old_epochs = kwargs['epochs']
+    #     kwargs['epochs'] = self.train_poison_epochs
+    #     ret = super().attack(**kwargs)
+    #     kwargs['epochs'] = old_epochs
+    #     return ret
+
+    def train_trigger_generator(self, other_loader, verbose: bool = True):
+
+        normalized_weight = self.model._model.classifier[0].weight
+        normalized_weight = torch.transpose(normalized_weight, 0, 1)
+        normalized_weight = torch.nn.functional.normalize(normalized_weight, dim=0).data
+
+        r"""Train :attr:`self.trigger_generator`."""
+        optimizer = torch.optim.Adam(self.trigger_generator.parameters(), lr=1e-3, betas=(0.5, 0.9))
+        # optimizer = torch.optim.SGD(self.trigger_generator.parameters(), lr=1e-2)
+        # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer, T_max=self.train_trigger_epochs)
+        loader = other_loader
+        logger = MetricLogger()
+        logger.create_meters(loss=None, probs_diff=None)
+        print_prefix = 'Trigger Epoch'
+
+        self.model.eval()
+        self.trigger_generator.train()
+        for _epoch in range(self.train_trigger_epochs):
+
+            _epoch += 1
+            logger.reset()
+            header: str = '{blue_light}{0}: {1}{reset}'.format(
+                print_prefix, output_iter(_epoch, self.train_trigger_epochs), **ansi)
+            header = header.ljust(max(len(print_prefix), 30) + get_ansi_len(header))
+
+            self.trigger_generator.train()
+            for data in logger.log_every(loader, header=header) if verbose else loader:
+                optimizer.zero_grad()
+                _input, _label = self.model.get_data(data)
+                batch_size = len(_label)
+
+                tgt_label = self.target_class * torch.ones_like(_label)
+                tgt_ones = F.one_hot(tgt_label, num_classes=self.dataset.num_classes)
+                src_ones = F.one_hot(_label, num_classes=self.dataset.num_classes)
+                trigger_label = self.get_trigger_label(_label, target_label=self.target_class, prob_diff=-self.alpha)
+
+                trigger_input = self.add_mark(_input)
+                trigger_logits = self.model(trigger_input)
+                batch_entropy = F.cross_entropy(trigger_logits, trigger_label)
+
+                trigger_probs = F.softmax(trigger_logits.data, dim=-1)
+                tgt_probs = torch.sum(trigger_probs * tgt_ones, dim=-1)
+                src_probs = torch.sum(trigger_probs * src_ones, dim=-1)
+                probs_diff = torch.mean(src_probs - tgt_probs)
+
+
+                loss = batch_entropy
+                loss.backward()
+                optimizer.step()
+                logger.update(n=batch_size, loss=loss.item(), probs_diff=probs_diff.item())
+            # lr_scheduler.step()
+            self.trigger_generator.eval()
+        optimizer.zero_grad()
 
     def optimize_mark(self, label: int,
                       loader: Iterable = None,
@@ -118,7 +179,7 @@ class TSABackdoor(BackdoorAttack):
         self.acc_threshold = self.clean_acc
 
         atanh_mark = torch.randn_like(self.mark.mark, requires_grad=True)
-        optimizer = optim.Adam([atanh_mark], lr=self.train_mark_lr, betas=(0.5, 0.9))
+        optimizer = optim.Adam([atanh_mark], lr=self.train_mark_lr, betas=(0.9, 0.98))
         # optimizer = optim.SGD([atanh_mark], lr=self.train_mark_lr, momentum=0.9)
         lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                             T_max=self.train_mark_epochs)
@@ -334,7 +395,7 @@ class TSABackdoor(BackdoorAttack):
         r"""Get filenames for current attack settings."""
         target_class = self.target_class
         source_class = self.source_class
-        _file = 'alpha{alpha:.1f}_tgt{target:d}_src{src}_norm{norm:.0f}'.format(
-            alpha=self.alpha, target=target_class, src=source_class, norm=self.lp_norm)
+        _file = 'alpha{alpha:.1f}_tgt{target:d}_src{src}_norm{norm:.0f}_pr{pr}'.format(
+            alpha=self.alpha, target=target_class, src=source_class, norm=self.lp_norm, pr=self.poison_percent)
         return _file
 
