@@ -4,7 +4,10 @@ from trojanzoo.utils.output import ansi, output_iter, prints, redirect
 
 import os
 import functools
-from collections.abc import Iterable
+
+#semantic
+from typing import Iterable
+#from collections.abc import Iterable
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
