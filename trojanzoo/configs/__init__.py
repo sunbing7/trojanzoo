@@ -15,7 +15,7 @@ r"""
 
 from trojanzoo.utils.output import prints, ansi
 from trojanzoo.utils.module import Module, Param
-from typing import Union, Dict
+from typing import Union, Dict, List
 import os
 import json
 import yaml
@@ -145,7 +145,7 @@ class Config:
         config.update(kwargs)
         return config
 
-    def merge(self, keys: list[str] = ['package', 'user', 'project']
+    def merge(self, keys: List[str] = ['package', 'user', 'project']
               ) -> ConfigType:
         r"""Merge different configs of :attr:`keys` in :attr:`self.config_dict`.
 
@@ -232,7 +232,7 @@ class Config:
     def keys(self):
         return self.config_dict.keys()
 
-    def summary(self, keys: Union[str, list[str]] = ['final'],
+    def summary(self, keys: Union[str, List[str]] = ['final'],
                 config: ConfigType = None, indent: int = 0):
         r"""Summary the config information.
 
