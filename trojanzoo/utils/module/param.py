@@ -2,6 +2,9 @@
 
 from trojanzoo.utils.output import prints
 
+#semantic
+from typing import Dict
+
 from typing import Generic, MutableMapping, TypeVar
 _KT = TypeVar("_KT")  # Key type.
 _VT = TypeVar("_VT")  # Value type.
@@ -164,14 +167,14 @@ class Param(Module, Generic[_KT, _VT]):
     """
     _marker = 'P'
 
-    def update(self, *args: dict[_KT, _VT], **kwargs: _VT):
+    def update(self, *args: Dict[_KT, _VT], **kwargs: _VT):
         if len(kwargs) == 0 and len(args) == 1 and \
                 not isinstance(args[0], (dict, Module)):
             self.default = args[0]
             return self
         return super().update(*args, **kwargs)
 
-    def _update(self, module: dict[_KT, _VT]):
+    def _update(self, module: Dict[_KT, _VT]):
         for key, value in module.items():
             if key == 'default':
                 self.default = value
