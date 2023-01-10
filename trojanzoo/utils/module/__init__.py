@@ -4,12 +4,12 @@ from .param import Module, Param
 from .process import BasicObject, Process, ModelProcess
 from trojanzoo.utils.output import ansi, prints
 #semantic
-from typing import Union
+from typing import Union,List
 import sys
 
 
 def get_name(name: str = None, module: Union[str, object] = None,
-             arg_list: list[str] = []) -> str:
+             arg_list: List[str] = []) -> str:
     if module is not None:
         if isinstance(module, str):
             return module
