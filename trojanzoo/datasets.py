@@ -156,16 +156,16 @@ class Dataset(ABC, BasicObject):
             raise
         # ----------------------------------------------- #
         # Loss Weights
-        match loss_weights:
-            case bool():
-                # TODO: issue 5 pylance
-                loss_weights = self.get_loss_weights() if loss_weights else None
-            case np.ndarray():
-                loss_weights = torch.from_numpy(loss_weights).to(device=env['device'])
-            case torch.Tensor():
-                loss_weights = loss_weights.to(device=env['device'])
-            case _:
-                raise TypeError(type(loss_weights))
+        #match loss_weights:
+        if loss_weights == bool():
+            # TODO: issue 5 pylance
+            loss_weights = self.get_loss_weights() if loss_weights else None
+        elif loss_weights == np.ndarray():
+            loss_weights = torch.from_numpy(loss_weights).to(device=env['device'])
+        elif loss_weights == torch.Tensor():
+            loss_weights = loss_weights.to(device=env['device'])
+        else:
+            raise TypeError(type(loss_weights))
         self.loss_weights: None | torch.Tensor = loss_weights
 
     @functools.cached_property
@@ -400,13 +400,13 @@ class Dataset(ABC, BasicObject):
             torch.utils.data.DataLoader: The pytorch dataloader.
         """
         if batch_size is None:
-            match mode:
-                case 'train':
-                    batch_size = self.batch_size
-                case 'valid':
-                    batch_size = self.valid_batch_size
-                case _:
-                    raise ValueError(f'{mode=}')
+            #match mode:
+            if mode == 'train':
+                batch_size = self.batch_size
+            elif mode == 'valid':
+                batch_size = self.valid_batch_size
+            else:
+                raise ValueError(f'{mode=}')
         if shuffle is None:
             shuffle = (mode == 'train')
         if num_workers is None:

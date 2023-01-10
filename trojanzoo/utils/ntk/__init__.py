@@ -15,15 +15,15 @@ def empirical_ntk(module: nn.Module, input1: torch.Tensor, input2: torch.Tensor,
                   parameters: dict[str, nn.Parameter] | Iterable[nn.Parameter] = None,
                   compute='full') -> list[torch.Tensor]:
     einsum_expr: str = ''
-    match compute:
-        case 'full':
-            einsum_expr = 'Naf,Mbf->NMab'   # (N, M, C, C)
-        case 'trace':
-            einsum_expr = 'Naf,Maf->NM'     # (N, M)
-        case 'diagonal':
-            einsum_expr = 'Naf,Maf->NMa'    # (N, M, C)
-        case _:
-            raise ValueError(compute)
+    #match compute:
+    if compute == 'full':
+        einsum_expr = 'Naf,Mbf->NMab'   # (N, M, C, C)
+    elif compute == 'trace':
+        einsum_expr = 'Naf,Maf->NM'     # (N, M)
+    elif compute == 'diagonal':
+        einsum_expr = 'Naf,Maf->NMa'    # (N, M, C)
+    else:
+        raise ValueError(compute)
 
     if not isinstance(parameters, dict):
         id_map: dict[torch.Tensor, str] = {

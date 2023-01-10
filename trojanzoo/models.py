@@ -316,11 +316,11 @@ class Model(BasicObject):
         # TODO: what device shall we save loss_weights?
         # numpy, torch, or torch.cuda.
 
-        match loss_weights:
-            case np.ndarray():
-                loss_weights = torch.from_numpy(loss_weights).to(device=env['device'], dtype=torch.float)
-            case torch.Tensor():
-                loss_weights = loss_weights.to(device=env['device'], dtype=torch.float)
+        #match loss_weights:
+        if loss_weights == np.ndarray():
+            loss_weights = torch.from_numpy(loss_weights).to(device=env['device'], dtype=torch.float)
+        elif loss_weights == torch.Tensor():
+            loss_weights = loss_weights.to(device=env['device'], dtype=torch.float)
 
         self.loss_weights = loss_weights
         self.layer_name_list: list[str] = None
@@ -330,15 +330,15 @@ class Model(BasicObject):
         self.criterion_noreduction = self.define_criterion(
             weight=loss_weights, reduction='none')
         self.softmax = nn.Softmax(dim=1)
-        match model:
-            case type():
-                if num_classes is not None:
-                    kwargs['num_classes'] = num_classes
-                self._model = model(name=name, dataset=dataset, **kwargs)
-            case nn.Module():
-                self._model = model
-            case _:
-                raise TypeError(type(model))
+        #match model:
+        if model == type():
+            if num_classes is not None:
+                kwargs['num_classes'] = num_classes
+            self._model = model(name=name, dataset=dataset, **kwargs)
+        elif model == nn.Module():
+            self._model = model
+        else:
+            raise TypeError(type(model))
         self.model = self.get_parallel_model(self._model)
         self.activate_params([])
         if official:
@@ -461,11 +461,11 @@ class Model(BasicObject):
         Returns:
             torch.Tensor: The probability tensor with shape ``(N)``.
         """
-        match target:
-            case int():
-                target = [target] * len(_input)
-            case list():
-                target = torch.tensor(target, device=_input.device)
+        #match target:
+        if target == int():
+            target = [target] * len(_input)
+        elif target == list():
+            target = torch.tensor(target, device=_input.device)
         return self.get_prob(_input, **kwargs).gather(
             dim=1, index=target.unsqueeze(1)).flatten()
 
@@ -594,13 +594,13 @@ class Model(BasicObject):
             :func:`trojanzoo.utils.model.get_layer()`.
         """
         if layer_input == 'input':
-            match layer_output:
-                case 'classifier':
-                    return self(_input)
-                case 'features':
-                    return self._model.get_fm(_input)
-                case 'flatten':
-                    return self.get_final_fm(_input)
+            #match layer_output:
+            if layer_output == 'classifier':
+                return self(_input)
+            elif layer_output == 'features':
+                return self._model.get_fm(_input)
+            elif layer_output == 'flatten':
+                return self.get_final_fm(_input)
         if self.layer_name_list is None:
             self.layer_name_list: list[str] = self.get_layer_name(
                 use_filter=False, non_leaf=True)
@@ -711,13 +711,13 @@ class Model(BasicObject):
         """
         kwargs['momentum'] = momentum
         kwargs['weight_decay'] = weight_decay
-        match parameters:
-            case str():
-                parameters = self.get_parameter_from_name(name=parameters)
-            case Iterable():
-                pass
-            case _:
-                raise TypeError(f'{type(parameters)=}    {parameters=}')
+        #match parameters:
+        if parameters == str():
+            parameters = self.get_parameter_from_name(name=parameters)
+        elif parameters == Iterable():
+            pass
+        else:
+            raise TypeError(f'{type(parameters)=}    {parameters=}')
         if isinstance(OptimType, str):
             OptimType: type[Optimizer] = getattr(torch.optim, OptimType)
         keys = OptimType.__init__.__code__.co_varnames
@@ -726,35 +726,35 @@ class Model(BasicObject):
         _lr_scheduler: _LRScheduler = None
         if lr_scheduler:
             main_lr_scheduler: _LRScheduler
-            match lr_scheduler_type:
-                case 'StepLR':
-                    main_lr_scheduler = torch.optim.lr_scheduler.StepLR(
-                        optimizer, step_size=lr_step_size, gamma=lr_gamma)
-                case 'CosineAnnealingLR':
-                    main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                        optimizer, T_max=epochs - lr_warmup_epochs, eta_min=lr_min)
-                case 'ExponentialLR':
-                    main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
-                        optimizer, gamma=lr_gamma)
-                case _:
-                    raise NotImplementedError(
-                        f'Invalid {lr_scheduler_type=}.'
-                        'Only "StepLR", "CosineAnnealingLR" and "ExponentialLR" '
-                        'are supported.')
+            #match lr_scheduler_type:
+            if lr_scheduler_type == 'StepLR':
+                main_lr_scheduler = torch.optim.lr_scheduler.StepLR(
+                    optimizer, step_size=lr_step_size, gamma=lr_gamma)
+            elif lr_scheduler_type == 'CosineAnnealingLR':
+                main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer, T_max=epochs - lr_warmup_epochs, eta_min=lr_min)
+            elif lr_scheduler_type == 'ExponentialLR':
+                main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
+                    optimizer, gamma=lr_gamma)
+            else:
+                raise NotImplementedError(
+                    f'Invalid {lr_scheduler_type=}.'
+                    'Only "StepLR", "CosineAnnealingLR" and "ExponentialLR" '
+                    'are supported.')
             if lr_warmup_epochs > 0:
-                match lr_warmup_method:
-                    case 'linear':
-                        warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
-                            optimizer, start_factor=lr_warmup_decay,
-                            total_iters=lr_warmup_epochs)
-                    case 'constant':
-                        warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
-                            optimizer, factor=lr_warmup_decay,
-                            total_iters=lr_warmup_epochs)
-                    case _:
-                        raise NotImplementedError(
-                            f'Invalid {lr_warmup_method=}.'
-                            'Only "linear" and "constant" are supported.')
+                #match lr_warmup_method:
+                if lr_warmup_method == 'linear':
+                    warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                        optimizer, start_factor=lr_warmup_decay,
+                        total_iters=lr_warmup_epochs)
+                elif lr_warmup_method == 'constant':
+                    warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
+                        optimizer, factor=lr_warmup_decay,
+                        total_iters=lr_warmup_epochs)
+                else:
+                    raise NotImplementedError(
+                        f'Invalid {lr_warmup_method=}.'
+                        'Only "linear" and "constant" are supported.')
                 _lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
                     optimizer,
                     schedulers=[warmup_lr_scheduler, main_lr_scheduler],
@@ -860,19 +860,19 @@ class Model(BasicObject):
                 print(f'{file_path=}')
                 raise
         module = self._model
-        match component:
-            case 'features':
-                module = self._model.features
-                _dict = OrderedDict(
-                    [(key.removeprefix('features.'), value)
-                        for key, value in _dict.items()])
-            case 'classifier':
-                module = self._model.classifier
-                _dict = OrderedDict(
-                    [(key.removeprefix('classifier.'), value)
-                        for key, value in _dict.items()])
-            case _:
-                assert component == 'full', f'{component=}'
+        #match component:
+        if component == 'features':
+            module = self._model.features
+            _dict = OrderedDict(
+                [(key.removeprefix('features.'), value)
+                    for key, value in _dict.items()])
+        elif component == 'classifier':
+            module = self._model.classifier
+            _dict = OrderedDict(
+                [(key.removeprefix('classifier.'), value)
+                    for key, value in _dict.items()])
+        else:
+            assert component == 'full', f'{component=}'
         if inplace:
             try:
                 module.load_state_dict(_dict, strict=strict)
@@ -1348,15 +1348,15 @@ class Model(BasicObject):
 
     def get_parameter_from_name(self, name: str = 'full'
                                 ) -> Iterator[nn.Parameter]:
-        match name:
-            case 'features':
-                params = self._model.features.parameters()
-            case 'classifier' | 'partial':
-                params = self._model.classifier.parameters()
-            case 'full':
-                params = self._model.parameters()
-            case _:
-                raise NotImplementedError(f'{name=}')
+        #match name:
+        if name == 'features':
+            params = self._model.features.parameters()
+        elif name == 'classifier' | 'partial':
+            params = self._model.classifier.parameters()
+        elif name == 'full':
+            params = self._model.parameters()
+        else:
+            raise NotImplementedError(f'{name=}')
         return params
 
     def __call__(self, _input: torch.Tensor, amp: bool = False,

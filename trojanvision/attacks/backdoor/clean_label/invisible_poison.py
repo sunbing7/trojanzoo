@@ -105,66 +105,66 @@ class InvisiblePoison(CleanLabelBackdoor):
     #     return (x + self.noise_alpha * self.mark.mark[:-1].to(device=x.device)).clamp(0, 1)
 
     def define_generator(self, mode: str = 'resnet') -> nn.Sequential:
-        match mode:
-            case 'resnet':
-                # torchvision.models.feature_extraction.create_feature_extractor(
-                #     torchvision.models.resnet18(pretrained=True),
-                #     ['layer1'])
-                resnet_model = torchvision.models.resnet18(pretrained=True)
-                encoder = nn.Sequential(*list(resnet_model.children())[:5])
-                bottleneck = nn.Sequential(
-                    ResNetBlock(64),
-                    ResNetBlock(64),
-                    ResNetBlock(64))
-                decoder = nn.Sequential(
-                    nn.UpsamplingNearest2d(scale_factor=2),
-                    nn.ConvTranspose2d(64, 3, kernel_size=7, stride=2, padding=3, output_padding=1, bias=False),
-                    nn.Tanh())
-            case 'resnet_comp':
-                resnet_model = trojanvision.models.create('resnet18_comp',
-                                                          dataset=self.dataset,
-                                                          pretrained=True)
-                encoder = nn.Sequential(*list(resnet_model._model.features.cpu().children())[:4])
-                bottleneck = nn.Sequential(
-                    ResNetBlock(64),
-                    ResNetBlock(64),
-                    ResNetBlock(64))
-                decoder = nn.Sequential(
-                    nn.ConvTranspose2d(64, 3, kernel_size=3, stride=1, padding=1, bias=False),
-                    nn.Tanh())
-            case 'default':
-                encoder = nn.Sequential(
-                    # MNIST:1*28*28
-                    nn.Conv2d(3, 8, kernel_size=3, stride=1, padding=0, bias=True),
-                    nn.InstanceNorm2d(8), nn.ReLU(),
-                    # 8*26*26
-                    nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=0, bias=True),
-                    nn.InstanceNorm2d(16), nn.ReLU(),
-                    # 16*12*12
-                    nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=0, bias=True),
-                    nn.InstanceNorm2d(32), nn.ReLU(),
-                    # 32*5*5
-                )
-                bottleneck = nn.Sequential(
-                    ResNetBlock(32),
-                    ResNetBlock(32),
-                    ResNetBlock(32),
-                    ResNetBlock(32))
-                decoder = nn.Sequential(
-                    nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=0, bias=False),
-                    nn.InstanceNorm2d(16),
-                    nn.ReLU(),
-                    # state size. 16 x 11 x 11
-                    nn.ConvTranspose2d(16, 8, kernel_size=3, stride=2, padding=0, bias=False),
-                    nn.InstanceNorm2d(8),
-                    nn.ReLU(),
-                    # state size. 8 x 23 x 23
-                    nn.ConvTranspose2d(8, 3, kernel_size=6, stride=1, padding=0, bias=False),
-                    nn.Tanh()
-                    # state size. image_nc x 28 x 28
-                )
-            case _:
-                raise NotImplementedError(f'{self.generator_mode=}')
+        #match mode:
+        if mode == 'resnet':
+            # torchvision.models.feature_extraction.create_feature_extractor(
+            #     torchvision.models.resnet18(pretrained=True),
+            #     ['layer1'])
+            resnet_model = torchvision.models.resnet18(pretrained=True)
+            encoder = nn.Sequential(*list(resnet_model.children())[:5])
+            bottleneck = nn.Sequential(
+                ResNetBlock(64),
+                ResNetBlock(64),
+                ResNetBlock(64))
+            decoder = nn.Sequential(
+                nn.UpsamplingNearest2d(scale_factor=2),
+                nn.ConvTranspose2d(64, 3, kernel_size=7, stride=2, padding=3, output_padding=1, bias=False),
+                nn.Tanh())
+        elif mode == 'resnet_comp':
+            resnet_model = trojanvision.models.create('resnet18_comp',
+                                                      dataset=self.dataset,
+                                                      pretrained=True)
+            encoder = nn.Sequential(*list(resnet_model._model.features.cpu().children())[:4])
+            bottleneck = nn.Sequential(
+                ResNetBlock(64),
+                ResNetBlock(64),
+                ResNetBlock(64))
+            decoder = nn.Sequential(
+                nn.ConvTranspose2d(64, 3, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.Tanh())
+        elif mode == 'default':
+            encoder = nn.Sequential(
+                # MNIST:1*28*28
+                nn.Conv2d(3, 8, kernel_size=3, stride=1, padding=0, bias=True),
+                nn.InstanceNorm2d(8), nn.ReLU(),
+                # 8*26*26
+                nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=0, bias=True),
+                nn.InstanceNorm2d(16), nn.ReLU(),
+                # 16*12*12
+                nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=0, bias=True),
+                nn.InstanceNorm2d(32), nn.ReLU(),
+                # 32*5*5
+            )
+            bottleneck = nn.Sequential(
+                ResNetBlock(32),
+                ResNetBlock(32),
+                ResNetBlock(32),
+                ResNetBlock(32))
+            decoder = nn.Sequential(
+                nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=0, bias=False),
+                nn.InstanceNorm2d(16),
+                nn.ReLU(),
+                # state size. 16 x 11 x 11
+                nn.ConvTranspose2d(16, 8, kernel_size=3, stride=2, padding=0, bias=False),
+                nn.InstanceNorm2d(8),
+                nn.ReLU(),
+                # state size. 8 x 23 x 23
+                nn.ConvTranspose2d(8, 3, kernel_size=6, stride=1, padding=0, bias=False),
+                nn.Tanh()
+                # state size. image_nc x 28 x 28
+            )
+        else:
+            raise NotImplementedError(f'{self.generator_mode=}')
         return nn.Sequential(OrderedDict([
             ('encoder', encoder),
             ('bottleneck', bottleneck),
@@ -177,15 +177,15 @@ class InvisiblePoison(CleanLabelBackdoor):
                                                   dataset=self.dataset,
                                                   pretrained=True)
         model_extractor = nn.Sequential(*list(resnet_model._model.features.children())[:4])
-        match self.generator_mode:
-            case 'resnet':
-                resnet_model = torchvision.models.resnet18(pretrained=True).to(device=env['device'])
-                model_extractor = nn.Sequential(*list(resnet_model.children())[:5])
-            case _:
-                resnet_model = trojanvision.models.create('resnet18_comp',
-                                                          dataset=self.dataset,
-                                                          pretrained=True)
-                model_extractor = nn.Sequential(*list(resnet_model._model.features.children())[:4])
+        #match self.generator_mode:
+        if self.generator_mode == 'resnet':
+            resnet_model = torchvision.models.resnet18(pretrained=True).to(device=env['device'])
+            model_extractor = nn.Sequential(*list(resnet_model.children())[:5])
+        else:
+            resnet_model = trojanvision.models.create('resnet18_comp',
+                                                      dataset=self.dataset,
+                                                      pretrained=True)
+            model_extractor = nn.Sequential(*list(resnet_model._model.features.children())[:4])
         model_extractor.requires_grad_(False)
         model_extractor.train()
 

@@ -53,6 +53,7 @@ def set_first_layer_channel(model: nn.Module,
             set_first_layer_channel(module, channel=channel)
             break
         else:
+            '''
             match module:
                 case nn.Conv2d():
                     if module.in_channels == channel:
@@ -72,6 +73,25 @@ def set_first_layer_channel(model: nn.Module,
                     args.update(kwargs)
                     new_linear = nn.Linear(in_features=channel, **args)
                     setattr(model, name, new_linear)
+            '''
+            if module == nn.Conv2d():
+                if module.in_channels == channel:
+                    break
+                keys = ['out_channels', 'kernel_size', 'bias', 'stride', 'padding']
+                args = {key: getattr(module, key) for key in keys}
+                args['device'] = module.weight.device
+                args.update(kwargs)
+                new_conv = nn.Conv2d(in_channels=channel, **args)
+                setattr(model, name, new_conv)
+            elif module == nn.Linear():
+                if module.in_features == channel:
+                    break
+                keys = ['out_features', 'bias']
+                args = {key: getattr(module, key) for key in keys}
+                args['device'] = module.weight.device
+                args.update(kwargs)
+                new_linear = nn.Linear(in_features=channel, **args)
+                setattr(model, name, new_linear)
         break
 
 
@@ -423,6 +443,7 @@ class ImageModel(Model):
             _label = [_label] * len(_input)
         _label = torch.as_tensor(_label, device=_input.device)
         heatmap = _input    # linting purpose
+        '''
         match method:
             case 'grad_cam':
                 feats = self._model.get_fm(_input).detach()   # (N, C', H', W')
@@ -450,6 +471,33 @@ class ImageModel(Model):
                 heatmap.div_(heatmap.amax(dim=-2, keepdim=True).amax(dim=-1, keepdim=True))
             case _:
                 raise NotImplementedError(f'{method=} is not supported yet.')
+        '''
+        if method == 'grad_cam':
+            feats = self._model.get_fm(_input).detach()   # (N, C', H', W')
+            feats.requires_grad_()
+            _output: torch.Tensor = self._model.pool(feats)   # (N, C', 1, 1)
+            _output = self._model.flatten(_output)   # (N, C')
+            _output = self._model.classifier(_output)   # (N, num_classes)
+            _output = _output.gather(dim=1, index=_label.unsqueeze(1)).sum()
+            grad = torch.autograd.grad(_output, feats)[0]   # (N, C', H', W')
+            feats.requires_grad_(False)
+            weights = grad.mean(dim=-2, keepdim=True).mean(dim=-1, keepdim=True)    # (N, C', 1, 1)
+            heatmap = (feats * weights).sum(dim=1, keepdim=True).clamp(0)  # (N, 1, H', W')
+            # heatmap.sub_(heatmap.amin(dim=-2, keepdim=True).amin(dim=-1, keepdim=True))
+            heatmap.div_(heatmap.amax(dim=-2, keepdim=True).amax(dim=-1, keepdim=True))
+            heatmap: torch.Tensor = F.interpolate(heatmap, _input.shape[-2:], mode=mode)[:, 0]   # (N, H, W)
+            # Note that we violate the image order convension (W, H, C)
+        elif method == 'saliency_map':
+            _input.requires_grad_()
+            _output = self(_input).gather(dim=1, index=_label.unsqueeze(1)).sum()
+            grad = torch.autograd.grad(_output, _input)[0]   # (N, C, H, W)
+            _input.requires_grad_(False)
+
+            heatmap = grad.abs().amax(dim=1)   # (N, H, W)
+            heatmap.sub_(heatmap.amin(dim=-2, keepdim=True).amin(dim=-1, keepdim=True))
+            heatmap.div_(heatmap.amax(dim=-2, keepdim=True).amax(dim=-1, keepdim=True))
+        else:
+            raise NotImplementedError(f'{method=} is not supported yet.')
         heatmap = apply_cmap(heatmap.detach().cpu(), cmap)
         return heatmap[0] if squeeze_flag else heatmap
 
@@ -580,6 +628,7 @@ class ImageModel(Model):
                  adv_train: str = None) -> torch.Tensor:
         adv_train = adv_train if adv_train is not None else self.adv_train
         loss_fn = loss_fn if callable(loss_fn) else self.loss
+        '''
         match adv_train:
             case 'trades':
                 noise = 1e-3 * torch.randn_like(_input)
@@ -603,3 +652,27 @@ class ImageModel(Model):
                 return loss_fn(adv_x, _label)
             case _:
                 raise NotImplementedError(f'{adv_train=} is not supported yet.')
+
+        '''
+        if adv_train == 'trades':
+            noise = 1e-3 * torch.randn_like(_input)
+            org_prob = self.get_prob(_input)
+            adv_x, _ = self.pgd.optimize(_input=_input, noise=noise, target=_label,
+                                         iteration=self.adv_train_iter,
+                                         pgd_alpha=self.adv_train_alpha,
+                                         pgd_eps=self.adv_train_eps,
+                                         loss_fn=self.trades_loss_fn,
+                                         loss_kwargs={'org_prob': org_prob.detach()})
+            adv_x = _input + (adv_x - _input).detach()
+            return loss_fn(_input, _label) - self.adv_train_trades_beta * \
+                self.trades_loss_fn(_input=adv_x, org_prob=org_prob)
+        elif adv_train == 'pgd':
+            adv_x, _ = self.pgd.optimize(_input=_input, target=_label,
+                                         iteration=self.adv_train_iter,
+                                         pgd_alpha=self.adv_train_alpha,
+                                         pgd_eps=self.adv_train_eps,
+                                         random_init=self.adv_train_random_init)
+            adv_x = _input + (adv_x - _input).detach()
+            return loss_fn(adv_x, _label)
+        else:
+            raise NotImplementedError(f'{adv_train=} is not supported yet.')

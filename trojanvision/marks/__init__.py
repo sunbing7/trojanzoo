@@ -28,6 +28,7 @@ def get_edge_color(
     if not mark[-1].allclose(torch.ones_like(mark[-1]), atol=1e-3):
         return None
     mark = mark[:-1]    # remove alpha channel
+    '''
     match mark_background_color:
         case torch.Tensor():
             return torch.as_tensor(mark_background_color).expand(mark.size(0))
@@ -44,6 +45,22 @@ def get_edge_color(
                 return torch.cat(_list, dim=1).mode(dim=-1)[0]
         case _:
             raise ValueError(f'{mark_background_color=:s}')
+    '''
+    if mark_background_color == torch.Tensor():
+        return torch.as_tensor(mark_background_color).expand(mark.size(0))
+    elif mark_background_color == 'black':
+        return torch.zeros(mark.size(0))
+    elif mark_background_color == 'white':
+        return torch.ones(mark.size(0))
+    elif mark_background_color == 'auto':
+        if mark.flatten(1).std(1).max() < 1e-3:
+            return None
+        else:
+            _list = [mark[:, 0, :], mark[:, -1, :],
+                     mark[:, :, 0], mark[:, :, -1]]
+            return torch.cat(_list, dim=1).mode(dim=-1)[0]
+    else:
+        raise ValueError(f'{mark_background_color=:s}')
 
 
 def update_mark_alpha_channel(

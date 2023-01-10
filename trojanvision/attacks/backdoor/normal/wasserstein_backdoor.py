@@ -212,15 +212,15 @@ class WasserteinBackdoor(BackdoorAttack):
     @staticmethod
     def get_trigger_generator(in_channels: int = 3, image_size: int = 32) -> torch.nn.Module:
         a = None
-        match image_size:
-            case 28:
-                a = [64, 128]
-            case 32:
-                a = [64, 128]
-            case 224:
-                a = [64, 128, 256, 512, 1024]
-            case _:
-                raise NotImplementedError
+        #match image_size:
+        if image_size == 28:
+            a = [64, 128]
+        elif image_size == 32:
+            a = [64, 128]
+        elif image_size == 224:
+            a = [64, 128, 256, 512, 1024]
+        else:
+            raise NotImplementedError
 
         a.reverse()
         dec_chs = tuple(a)

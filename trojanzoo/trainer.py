@@ -286,11 +286,11 @@ def create(dataset_name: None | str = None,
     optimizer, lr_scheduler = model.define_optimizer(**optim_args)
 
     module = model._model
-    match optim_args['parameters']:
-        case 'features':
-            module = module.features
-        case 'classifier':
-            module = module.classifier
+    #match optim_args['parameters']:
+    if optim_args['parameters'] == 'features':
+        module = module.features
+    elif optim_args['parameters'] == 'classifier':
+        module = module.classifier
 
     # https://github.com/pytorch/vision/blob/main/references/classification/train.py
     model_ema_module = None
@@ -308,13 +308,13 @@ def create(dataset_name: None | str = None,
         model_ema_module = ExponentialMovingAverage(
             model._model, decay=1.0 - alpha)
 
-    match pre_conditioner:
-        case 'kfac':
-            kfac_optimizer = KFAC(module)
-        case 'ekfac':
-            kfac_optimizer = EKFAC(module)
-        case _:
-            kfac_optimizer = None
+    #match pre_conditioner:
+    if pre_conditioner == 'kfac':
+        kfac_optimizer = KFAC(module)
+    elif pre_conditioner == 'ekfac':
+        kfac_optimizer = EKFAC(module)
+    else:
+        kfac_optimizer = None
 
     writer = None
     writer_args: dict[str, Any] = {}

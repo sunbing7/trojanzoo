@@ -176,12 +176,20 @@ class PGD(Attack, PGDoptimizer):
         if len(_input) == 0:
             return _input, None
         target_idx = self.target_idx if target_idx is None else target_idx
+        '''
         match target:
             case None:
                 target = self.generate_target(_input, idx=self.target_idx) if self.target_class is None \
                     else self.target_class * torch.ones(len(_input), dtype=torch.long, device=_input.device)
             case int():
                 target = target * torch.ones(len(_input), dtype=torch.long, device=_input.device)
+        '''
+
+        if target == None:
+            target = self.generate_target(_input, idx=self.target_idx) if self.target_class is None \
+                else self.target_class * torch.ones(len(_input), dtype=torch.long, device=_input.device)
+        elif if target == int():
+            target = target * torch.ones(len(_input), dtype=torch.long, device=_input.device)
         if loss_fn is None and self.loss_fn is None:
             untarget_condition = self.target_class is None and self.target_idx == 0
 
