@@ -161,6 +161,16 @@ def create(cmd_config_path: str = None, dataset_name: str = None, dataset: str =
     device: str | int | torch.device = result['device']
     if device is None:
         device = 'auto'
+
+    if device == torch.device():
+        pass
+    elif device == 'auto':
+        device = torch.device('cuda' if num_gpus else 'cpu')
+    elif device == 'gpu':
+        device = torch.device('cuda')
+    else:
+        device = torch.device(device)
+    '''
     match device:
         case torch.device():
             pass
@@ -170,6 +180,7 @@ def create(cmd_config_path: str = None, dataset_name: str = None, dataset: str =
             device = torch.device('cuda')
         case _:
             device = torch.device(device)
+    '''
     if device.type == 'cpu':
         num_gpus = 0
     if device.index is not None and torch.cuda.is_available():
