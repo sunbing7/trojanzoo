@@ -14,7 +14,7 @@ import argparse
 if TYPE_CHECKING:
     import torch.backends.cudnn
 
-from from typing import Union
+from typing import Union
 
 class Env(Param):
     r"""The dict-like environment class that inherits :class:`trojanzoo.utils.module.Param`.
