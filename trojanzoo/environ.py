@@ -14,6 +14,7 @@ import argparse
 if TYPE_CHECKING:
     import torch.backends.cudnn
 
+from from typing import Union
 
 class Env(Param):
     r"""The dict-like environment class that inherits :class:`trojanzoo.utils.module.Param`.
@@ -119,7 +120,7 @@ def create(cmd_config_path: str = None, dataset_name: str = None, dataset: str =
            seed: int = None, data_seed: int = None, cudnn_benchmark: bool = None,
            config: Config = config,
            cache_threshold: float = None, verbose: int = 0,
-           color: bool = None, device: str | int | torch.device = None, tqdm: bool = None,
+           color: bool = None, device: Union[str, int, torch.device] = None, tqdm: bool = None,
            **kwargs) -> Env:
     r"""
     | Load :attr:`env` values from config and command line.
