@@ -8,6 +8,7 @@ import functools
 #semantic
 from typing import Iterable
 from typing import Union
+from typing import Set
 #from collections.abc import Iterable
 
 from typing import TYPE_CHECKING
@@ -91,7 +92,7 @@ class Process(BasicObject):
     # -----------------------------------Output-------------------------------------#
 
     def get_output(self, org_output: Union[int, Iterable[str]] = None
-                   ) -> set[str]:
+                   ) -> Set[str]:
         r"""Get output items based on output level.
 
         Args:
@@ -112,7 +113,7 @@ class Process(BasicObject):
             return set(org_output)
 
     @classmethod
-    def get_output_int(cls, org_output: int = 0) -> set[str]:
+    def get_output_int(cls, org_output: int = 0) -> Set[str]:
         r"""Get output items based on output level integer.
 
             * ``0  - 4 : {'verbose'}``
@@ -128,7 +129,7 @@ class Process(BasicObject):
         Returns:
             set[str]: The set of output items.
         """
-        result: set[str] = set()
+        result: Set[str] = Set()
         if org_output > 0:
             result.add('verbose')
         if org_output >= 5:
