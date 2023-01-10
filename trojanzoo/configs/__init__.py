@@ -15,7 +15,7 @@ r"""
 
 from trojanzoo.utils.output import prints, ansi
 from trojanzoo.utils.module import Module, Param
-
+from typing import Union, Dict
 import os
 import json
 import yaml
@@ -23,13 +23,13 @@ import yaml
 from typing import TYPE_CHECKING
 from typing import Any
 # config_dict['package']['dataset'] dataset.yml
-ConfigFileType = Module[str, Any | Param[str, Any]]
+ConfigFileType = Module[str, Union[Any, Param[str, Any]]]
 ConfigType = Module[str, ConfigFileType]    # config_dict['package']
 if TYPE_CHECKING:
     pass    # TODO: python 3.10
 
 
-config_path: dict[str, str] = {
+config_path: Dict[str, str] = {
     'package': os.path.dirname(__file__),   # trojanzoo/configs/*/*.yml
     'user': os.path.normpath(os.path.expanduser(
         '~/.trojanzoo/configs/trojanzoo')),
@@ -85,7 +85,7 @@ class Config:
                  _base: 'Config' = None, **kwargs: str):
         self.config_path = kwargs
         # self._base = _base
-        self.config_dict: dict[str, ConfigType] = {}
+        self.config_dict: Dict[str, ConfigType] = {}
         self._cmd_config_path: str = cmd_config_path
         self.cmd_config: ConfigType
         self.full_config: ConfigType
@@ -162,7 +162,7 @@ class Config:
         return config
 
     @staticmethod
-    def combine_base(config_dict: dict[str, ConfigType], _base):
+    def combine_base(config_dict: Dict[str, ConfigType], _base):
         _base: Config = _base
         for key, value in _base.items():
             value = value.copy()
@@ -202,7 +202,7 @@ class Config:
             name, ext = os.path.splitext(os.path.split(path)[1])
             if ext in ['.yml', 'yaml', 'json']:
                 with open(path, 'r', encoding='utf-8') as f:
-                    _dict: dict[str, Any | dict[str, Any]] = {}
+                    _dict: dict[str, Union[Any, Dict[str, Any]]] = {}
                     if ext == 'json':
                         _dict = json.load(f.read())
                     else:
@@ -214,7 +214,7 @@ class Config:
             raise Exception(f'unknown: {path}')
 
     @staticmethod
-    def organize_config_file(_dict: dict[str, Any | dict[str, Any]]
+    def organize_config_file(_dict: Dict[str, Union[Any, Dict[str, Any]]]
                              ) -> ConfigFileType:
         module = Module()
         for key, value in _dict.items():
@@ -232,7 +232,7 @@ class Config:
     def keys(self):
         return self.config_dict.keys()
 
-    def summary(self, keys: str | list[str] = ['final'],
+    def summary(self, keys: Union[str, list[str]] = ['final'],
                 config: ConfigType = None, indent: int = 0):
         r"""Summary the config information.
 
